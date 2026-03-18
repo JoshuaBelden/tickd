@@ -11,6 +11,7 @@
     onUpdate,
     onDelete,
     onArchiveAllDone,
+    onCreateTask,
   }: {
     tasks: Task[]
     allTasks: Task[]
@@ -20,6 +21,7 @@
     onUpdate: (id: string, updates: Partial<Task>) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onArchiveAllDone: () => Promise<void>
+    onCreateTask: (title: string, statusId: string) => Promise<void>
   } = $props()
 
   let draggedTaskId = $state<string | null>(null)
@@ -92,6 +94,8 @@
 
   let confirmDeleteId = $state<string | null>(null)
   let confirmArchiveAllDoneCol = $state<string | null>(null)
+  let inlineAddCol = $state<string | null>(null)
+  let inlineAddTitle = $state("")
 </script>
 
 <div class="flex gap-4 p-6 h-full overflow-x-auto items-start">
@@ -249,6 +253,34 @@
             </div>
           </div>
         {/each}
+        {#if inlineAddCol === col.id}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="w-full bg-transparent text-sm text-gray-200 placeholder-gray-600 outline-none px-2 py-1.5 border border-border rounded"
+            placeholder="Task title, then Enter…"
+            bind:value={inlineAddTitle}
+            autofocus
+            onkeydown={async e => {
+              if (e.key === "Enter") {
+                await onCreateTask(inlineAddTitle, col.id)
+                inlineAddTitle = ""
+              }
+              if (e.key === "Escape") {
+                inlineAddCol = null
+                inlineAddTitle = ""
+              }
+            }}
+            onblur={() => {
+              inlineAddCol = null
+              inlineAddTitle = ""
+            }}
+          />
+        {:else}
+          <button
+            class="text-xs text-gray-600 hover:text-gray-400 w-full text-left py-1 px-2 transition-colors"
+            onclick={() => { inlineAddCol = col.id; inlineAddTitle = "" }}
+          >+ Add task</button>
+        {/if}
       </div>
       {/if}
     </div>

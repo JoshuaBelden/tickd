@@ -28,6 +28,9 @@
   let overlayTask = $state<Task | null>(null)
   let confirmArchiveAllDone = $state<string | null>(null)
 
+  let inlineAddGroup = $state<string | null>(null)
+  let inlineAddTitle = $state("")
+
   // Filters
   let filterStatus = $state<string | null>(null)
   let filterPriority = $state<string | null>(null)
@@ -137,6 +140,22 @@
     newTaskTitle = ""
     showNewTask = false
     $selectedTaskId = task._id
+  }
+
+  async function createQuickTask(title: string, status: string) {
+    if (!title.trim()) return
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        listId: data.list._id,
+        title,
+        status,
+        parentId: null,
+      }),
+    })
+    const task = await res.json()
+    tasks = [...tasks, task]
   }
 
   async function updateTask(taskId: string, updates: Partial<Task>) {
@@ -312,6 +331,35 @@
                       onDelete={deleteTask}
                     />
                   {/each}
+                  {#if inlineAddGroup === group.key}
+                    <!-- svelte-ignore a11y_autofocus -->
+                    <input
+                      class="w-full bg-transparent text-sm text-gray-200 placeholder-gray-600 outline-none px-3 py-1.5 border border-border rounded"
+                      placeholder="Task title, then Enter…"
+                      bind:value={inlineAddTitle}
+                      autofocus
+                      onkeydown={async e => {
+                        if (e.key === "Enter") {
+                          const status = groupBy === "status" ? group.key : newTaskStatus
+                          await createQuickTask(inlineAddTitle, status)
+                          inlineAddTitle = ""
+                        }
+                        if (e.key === "Escape") {
+                          inlineAddGroup = null
+                          inlineAddTitle = ""
+                        }
+                      }}
+                      onblur={() => {
+                        inlineAddGroup = null
+                        inlineAddTitle = ""
+                      }}
+                    />
+                  {:else}
+                    <button
+                      class="text-xs text-gray-600 hover:text-gray-400 px-3 py-1.5 w-full text-left transition-colors"
+                      onclick={() => { inlineAddGroup = group.key; inlineAddTitle = "" }}
+                    >+ Add task</button>
+                  {/if}
                 </div>
               </div>
             {/if}
@@ -327,6 +375,7 @@
           onUpdate={updateTask}
           onDelete={deleteTask}
           onArchiveAllDone={archiveAllDone}
+          onCreateTask={createQuickTask}
         />
       {:else}
         <!-- Map view -->
