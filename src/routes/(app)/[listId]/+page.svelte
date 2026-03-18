@@ -172,6 +172,10 @@
       // Task was archived — remove from local state and close detail
       tasks = tasks.filter(t => t._id !== taskId)
       if ($selectedTaskId === taskId) $selectedTaskId = null
+    } else if (updated.listId !== data.list._id) {
+      // Task was moved to another list — remove from local state and close detail
+      tasks = tasks.filter(t => t._id !== taskId)
+      if ($selectedTaskId === taskId) $selectedTaskId = null
     } else if (overlayTask?._id === taskId) {
       // Task was unarchived from overlay (e.g. moved to this list) — add to tasks
       overlayTask = null
@@ -461,6 +465,7 @@
     {allTags}
     currentListId={data.list._id}
     currentListStatusConfig={statusConfig}
+    lists={data.lists}
     onUpdate={updateTask}
     onDelete={deleteTask}
     onCreateSubtask={createSubtask}

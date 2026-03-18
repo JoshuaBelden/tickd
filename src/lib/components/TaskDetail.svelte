@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment"
   import { untrack } from "svelte"
-  import type { Checklist, ChecklistItem, StatusConfig, Task } from "$lib/types"
+  import type { Checklist, ChecklistItem, List, StatusConfig, Task } from "$lib/types"
   import { formatDate } from "$lib/utils"
   import { nanoid } from "nanoid"
 
@@ -12,6 +12,7 @@
     allTags,
     currentListId,
     currentListStatusConfig,
+    lists,
     onUpdate,
     onDelete,
     onCreateSubtask,
@@ -23,6 +24,7 @@
     allTags: string[]
     currentListId: string
     currentListStatusConfig: StatusConfig[]
+    lists: List[]
     onUpdate: (id: string, updates: Partial<Task>) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onCreateSubtask: (parentId: string, title: string) => Promise<void>
@@ -41,6 +43,7 @@
   let confirmDeleteChecklistId = $state<string | null>(null)
   let confirmDeleteTask = $state(false)
   let confirmArchiveTask = $state(false)
+  let showMoveList = $state(false)
 
   $effect(() => {
     titleValue = task.title
@@ -408,6 +411,30 @@
   <div class="px-4 py-3 border-t border-border flex-shrink-0 flex items-center justify-between gap-4">
     <span class="text-xs text-gray-600">Created {formatDate(task.createdAt)}</span>
     <div class="flex items-center gap-3">
+      {#if showMoveList}
+        <span class="flex items-center gap-1.5">
+          <select
+            class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300"
+            value={currentListId}
+            onchange={async e => {
+              const newListId = (e.target as HTMLSelectElement).value
+              if (newListId !== currentListId) {
+                showMoveList = false
+                await onUpdate(task._id, { listId: newListId })
+              } else {
+                showMoveList = false
+              }
+            }}
+          >
+            {#each lists as l (l._id)}
+              <option value={l._id}>{l.name}</option>
+            {/each}
+          </select>
+          <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => (showMoveList = false)}>Cancel</button>
+        </span>
+      {:else}
+        <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => (showMoveList = true)}>Move to list</button>
+      {/if}
       {#if task.archivedAt !== null}
         <button
           class="text-xs text-gray-400 hover:text-gray-100"
