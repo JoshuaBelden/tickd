@@ -24,8 +24,16 @@
   const doneSubtasks = $derived(
     tasks.filter(t => t.parentId === task._id && statusConfig.find(s => s.id === t.status)?.isDone).length,
   )
-  const checklistTotal = $derived(task.checklist?.length ?? 0)
-  const checklistDone = $derived(task.checklist?.filter(c => c.checked).length ?? 0)
+  const checklistTotal = $derived(
+    task.checklists && task.checklists.length > 0
+      ? task.checklists.reduce((sum, cl) => sum + cl.items.length, 0)
+      : (task.checklist?.length ?? 0),
+  )
+  const checklistDone = $derived(
+    task.checklists && task.checklists.length > 0
+      ? task.checklists.reduce((sum, cl) => sum + cl.items.filter(i => i.checked).length, 0)
+      : (task.checklist?.filter(c => c.checked).length ?? 0),
+  )
 
   const statusInfo = $derived(statusConfig.find(s => s.id === task.status))
   const isDone = $derived(statusInfo?.isDone ?? false)

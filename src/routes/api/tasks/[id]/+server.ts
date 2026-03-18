@@ -37,6 +37,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
     "dueDate",
     "tags",
     "checklist",
+    "checklists",
     "order",
     "nodePosition",
     "listId",

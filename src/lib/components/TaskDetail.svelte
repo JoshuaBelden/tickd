@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment"
-  import type { ChecklistItem, StatusConfig, Task } from "$lib/types"
+  import type { Checklist, ChecklistItem, StatusConfig, Task } from "$lib/types"
   import { formatDate } from "$lib/utils"
   import { nanoid } from "nanoid"
 
@@ -29,10 +29,32 @@
   let newSubtaskTitle = $state("")
   let newTagInput = $state("")
   let tagSuggestions = $state<string[]>([])
-  let newChecklistItem = $state("")
+  let showCompletedMap = $state<Record<string, boolean>>({})
+  let newItemMap = $state<Record<string, string>>({})
+  let editingChecklistId = $state<string | null>(null)
+  let editingChecklistTitle = $state("")
+  let confirmDeleteChecklistId = $state<string | null>(null)
 
   $effect(() => {
     titleValue = task.title
+  })
+
+  const effectiveChecklists = $derived(
+    task.checklists && task.checklists.length > 0
+      ? task.checklists
+      : task.checklist && task.checklist.length > 0
+        ? [{ id: "legacy", title: "Checklist", items: task.checklist }]
+        : [],
+  )
+
+  $effect(() => {
+    if (!browser) return
+    const cls = effectiveChecklists
+    const map: Record<string, boolean> = {}
+    for (const cl of cls) {
+      map[cl.id] = localStorage.getItem(`show-done-${cl.id}`) === "true"
+    }
+    showCompletedMap = map
   })
 
   const subtasks = $derived(tasks.filter(t => t.parentId === task._id))
@@ -45,20 +67,58 @@
     editingTitle = false
   }
 
-  async function addChecklistItem() {
-    if (!newChecklistItem.trim()) return
-    const item: ChecklistItem = { id: nanoid(), label: newChecklistItem.trim(), checked: false }
-    await onUpdate(task._id, { checklist: [...(task.checklist ?? []), item] })
-    newChecklistItem = ""
+  async function saveChecklistTitle(checklistId: string) {
+    const title = editingChecklistTitle.trim()
+    if (title) {
+      const updated = effectiveChecklists.map(cl => (cl.id === checklistId ? { ...cl, title } : cl))
+      await onUpdate(task._id, { checklists: updated, checklist: [] })
+    }
+    editingChecklistId = null
   }
 
-  async function toggleChecklistItem(itemId: string) {
-    const updated = (task.checklist ?? []).map(c => (c.id === itemId ? { ...c, checked: !c.checked } : c))
-    await onUpdate(task._id, { checklist: updated })
+  async function deleteChecklist(checklistId: string) {
+    const updated = effectiveChecklists.filter(cl => cl.id !== checklistId)
+    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    confirmDeleteChecklistId = null
   }
 
-  async function removeChecklistItem(itemId: string) {
-    await onUpdate(task._id, { checklist: (task.checklist ?? []).filter(c => c.id !== itemId) })
+  async function addChecklist() {
+    const title = `Checklist ${effectiveChecklists.length + 1}`
+    const newCl: Checklist = { id: nanoid(), title, items: [] }
+    await onUpdate(task._id, { checklists: [...effectiveChecklists, newCl], checklist: [] })
+  }
+
+  async function addChecklistItem(checklistId: string) {
+    const label = (newItemMap[checklistId] ?? "").trim()
+    if (!label) return
+    const newItem: ChecklistItem = { id: nanoid(), label, checked: false }
+    const updated = effectiveChecklists.map(cl =>
+      cl.id === checklistId ? { ...cl, items: [...cl.items, newItem] } : cl,
+    )
+    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    newItemMap = { ...newItemMap, [checklistId]: "" }
+  }
+
+  async function toggleChecklistItem(checklistId: string, itemId: string) {
+    const updated = effectiveChecklists.map(cl =>
+      cl.id === checklistId
+        ? { ...cl, items: cl.items.map(item => (item.id === itemId ? { ...item, checked: !item.checked } : item)) }
+        : cl,
+    )
+    await onUpdate(task._id, { checklists: updated, checklist: [] })
+  }
+
+  async function removeChecklistItem(checklistId: string, itemId: string) {
+    const updated = effectiveChecklists.map(cl =>
+      cl.id === checklistId ? { ...cl, items: cl.items.filter(item => item.id !== itemId) } : cl,
+    )
+    await onUpdate(task._id, { checklists: updated, checklist: [] })
+  }
+
+  function toggleShowCompleted(checklistId: string) {
+    const next = !(showCompletedMap[checklistId] ?? false)
+    showCompletedMap = { ...showCompletedMap, [checklistId]: next }
+    if (browser) localStorage.setItem(`show-done-${checklistId}`, String(next))
   }
 
   async function addTag(tag: string) {
@@ -208,41 +268,101 @@
       {/if}
     </div>
 
-    <!-- Checklist -->
-    <div>
-      <div class="flex items-center justify-between mb-1.5">
-        <label class="text-xs text-gray-500">Checklist</label>
-        {#if task.checklist?.length > 0}
-          <span class="text-xs text-gray-500"
-            >{task.checklist.filter(c => c.checked).length}/{task.checklist.length}</span
-          >
-        {/if}
-      </div>
-
-      <div class="space-y-1 mb-2">
-        {#each task.checklist ?? [] as item (item.id)}
-          <div class="flex items-center gap-2 group">
-            <input
-              type="checkbox"
-              class="accent-accent"
-              checked={item.checked}
-              onchange={() => toggleChecklistItem(item.id)}
-            />
-            <span class="flex-1 text-sm {item.checked ? 'line-through text-gray-500' : ''}">{item.label}</span>
-            <button
-              class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs"
-              onclick={() => removeChecklistItem(item.id)}>×</button
-            >
+    <!-- Checklists -->
+    <div class="space-y-4">
+      {#each effectiveChecklists as checklist (checklist.id)}
+        {@const doneCount = checklist.items.filter(i => i.checked).length}
+        {@const totalCount = checklist.items.length}
+        {@const showDone = showCompletedMap[checklist.id] ?? false}
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            {#if editingChecklistId === checklist.id}
+              <input
+                class="input text-xs flex-1 mr-2"
+                value={editingChecklistTitle}
+                oninput={e => (editingChecklistTitle = (e.target as HTMLInputElement).value)}
+                onblur={() => saveChecklistTitle(checklist.id)}
+                onkeydown={e => {
+                  if (e.key === "Enter") saveChecklistTitle(checklist.id)
+                  if (e.key === "Escape") editingChecklistId = null
+                }}
+                autofocus
+              />
+            {:else}
+              <label
+                class="text-xs text-gray-500 cursor-text hover:text-gray-300"
+                onclick={() => {
+                  editingChecklistId = checklist.id
+                  editingChecklistTitle = checklist.title
+                }}
+                role="button"
+                tabindex="0">{checklist.title}</label
+              >
+            {/if}
+            <div class="flex items-center gap-2">
+              {#if totalCount > 0}
+                <span class="text-xs text-gray-500">{doneCount}/{totalCount}</span>
+              {/if}
+              {#if confirmDeleteChecklistId === checklist.id}
+                <span class="text-xs text-gray-400">Delete?</span>
+                <button
+                  class="text-xs text-red-400 hover:text-red-300"
+                  onclick={() => deleteChecklist(checklist.id)}>Yes</button
+                >
+                <button
+                  class="text-xs text-gray-500 hover:text-gray-300"
+                  onclick={() => (confirmDeleteChecklistId = null)}>No</button
+                >
+              {:else}
+                <button
+                  class="text-xs text-gray-600 hover:text-red-400"
+                  onclick={() => (confirmDeleteChecklistId = checklist.id)}
+                  title="Delete checklist">Delete</button
+                >
+              {/if}
+            </div>
           </div>
-        {/each}
-      </div>
 
-      <input
-        class="input text-xs"
-        placeholder="Add checklist item..."
-        bind:value={newChecklistItem}
-        onkeydown={e => e.key === "Enter" && addChecklistItem()}
-      />
+          <div class="space-y-1 mb-2">
+            {#each checklist.items.filter(i => !i.checked || showDone) as item (item.id)}
+              <div class="flex items-center gap-2 group">
+                <input
+                  type="checkbox"
+                  class="accent-accent"
+                  checked={item.checked}
+                  onchange={() => toggleChecklistItem(checklist.id, item.id)}
+                />
+                <span class="flex-1 text-sm {item.checked ? 'line-through text-gray-500' : ''}">{item.label}</span>
+                <button
+                  class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs"
+                  onclick={() => removeChecklistItem(checklist.id, item.id)}>×</button
+                >
+              </div>
+            {/each}
+          </div>
+
+          {#if doneCount > 0}
+            <button
+              class="text-xs text-gray-500 hover:text-gray-300 mb-2 block"
+              onclick={() => toggleShowCompleted(checklist.id)}
+            >
+              {showDone ? "Hide" : "Show"} {doneCount} completed item{doneCount !== 1 ? "s" : ""}
+            </button>
+          {/if}
+
+          <input
+            class="input text-xs"
+            placeholder="Add item..."
+            value={newItemMap[checklist.id] ?? ""}
+            oninput={e => {
+              newItemMap = { ...newItemMap, [checklist.id]: (e.target as HTMLInputElement).value }
+            }}
+            onkeydown={e => e.key === "Enter" && addChecklistItem(checklist.id)}
+          />
+        </div>
+      {/each}
+
+      <button class="text-xs text-gray-500 hover:text-gray-300" onclick={addChecklist}>+ Add checklist</button>
     </div>
 
     <!-- Subtasks -->

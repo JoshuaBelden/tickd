@@ -35,6 +35,12 @@ export interface ChecklistItem {
   checked: boolean
 }
 
+export interface Checklist {
+  id: string
+  title: string
+  items: ChecklistItem[]
+}
+
 export interface NodePosition {
   x: number
   y: number
@@ -52,6 +58,7 @@ export interface Task {
   dueDate: string | null
   tags: string[]
   checklist: ChecklistItem[]
+  checklists: Checklist[]
   order: number
   nodePosition: NodePosition | null
   createdAt: string
