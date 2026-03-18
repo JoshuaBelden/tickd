@@ -112,16 +112,18 @@
     <span class="flex-1 text-sm {isDone ? 'line-through text-gray-500' : 'text-gray-100'} truncate">
       {task.title}
     </span>
+  </div>
 
-    <!-- Inline meta -->
+  <!-- Pills -->
+  <div class="flex items-center gap-1.5 px-4 flex-shrink-0">
     {#if checklistTotal > 0}
-      <span class="text-xs text-gray-500 flex-shrink-0 bg-white/5 rounded px-1">{checklistDone}/{checklistTotal}</span>
+      <span class="text-xs text-gray-500 bg-white/5 rounded px-1">Checklist {checklistDone}/{checklistTotal}</span>
     {/if}
     {#if subtaskCount > 0}
-      <span class="text-xs text-gray-500 flex-shrink-0">↳ {subtaskCount}</span>
+      <span class="text-xs text-gray-500 bg-white/5 rounded px-1">Subtasks {doneSubtasks}/{subtaskCount}</span>
     {/if}
     {#each task.tags.slice(0, 2) as tag}
-      <span class="text-xs text-gray-500 bg-white/5 rounded px-1.5 py-0.5 flex-shrink-0">{tag}</span>
+      <span class="text-xs text-gray-500 bg-white/5 rounded px-1.5 py-0.5">{tag}</span>
     {/each}
   </div>
 
