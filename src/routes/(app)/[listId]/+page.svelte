@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment"
+  import BoardView from "$lib/components/BoardView.svelte"
   import TaskCard from "$lib/components/TaskCard.svelte"
   import TaskDetail from "$lib/components/TaskDetail.svelte"
   import { selectedTaskId, viewMode } from "$lib/stores/ui"
@@ -167,6 +168,12 @@
           onclick={() => ($viewMode = "list")}>List</button
         >
         <button
+          class="px-2.5 py-1 text-xs rounded transition-colors {$viewMode === 'board'
+            ? 'bg-white/10 text-white'
+            : 'text-gray-400 hover:text-gray-200'}"
+          onclick={() => ($viewMode = "board")}>Board</button
+        >
+        <button
           class="px-2.5 py-1 text-xs rounded transition-colors {$viewMode === 'map'
             ? 'bg-white/10 text-white'
             : 'text-gray-400 hover:text-gray-200'}"
@@ -225,6 +232,16 @@
           {/each}
 
         </div>
+      {:else if $viewMode === "board"}
+        <BoardView
+          tasks={filteredTasks}
+          allTasks={tasks}
+          statusConfig={list.statusConfig}
+          selectedTaskId={$selectedTaskId}
+          onTaskClick={id => ($selectedTaskId = id)}
+          onUpdate={updateTask}
+          onDelete={deleteTask}
+        />
       {:else}
         <!-- Map view -->
         {#if browser}

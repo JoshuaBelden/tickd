@@ -1,7 +1,7 @@
 import { writable } from "svelte/store"
 
 export const selectedTaskId = writable<string | null>(null)
-export const viewMode = writable<"list" | "map">("list")
+export const viewMode = writable<"list" | "board" | "map">("list")
 
 function persistedWritable<T>(key: string, initial: T) {
   const stored = typeof window !== "undefined" ? localStorage.getItem(key) : null
