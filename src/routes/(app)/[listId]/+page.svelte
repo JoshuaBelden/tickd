@@ -294,78 +294,82 @@
     <!-- Content -->
     <div class="flex-1 overflow-y-auto">
       {#if $viewMode === "list"}
-        <div class="p-6 space-y-6">
+        <div class="flex flex-col">
+          <!-- Column headers -->
+          <div class="flex items-center px-4 py-1.5 text-xs text-gray-500 border-b border-border bg-background sticky top-0 z-10">
+            <div class="flex-1 flex items-center gap-2">
+              <div class="w-2.5 flex-shrink-0"></div><!-- spacer for status dot -->
+              <span>Task</span>
+            </div>
+            <div class="w-28 flex-shrink-0">Priority</div>
+            <div class="w-28 flex-shrink-0">Due Date</div>
+            <div class="w-6 flex-shrink-0"></div>
+          </div>
+
           {#each groupedTasks as group (group.key)}
             {#if group.tasks.length > 0 || groupBy === "status"}
-              <div>
-                <div class="flex items-center gap-2 mb-2">
-                  {#if group.color}
-                    <span class="text-xs font-medium text-white rounded px-2 py-0.5" style="background:{group.color}">{group.label}</span>
+              <!-- Status group header -->
+              <div class="flex items-center gap-2 px-4 py-1.5 border-b border-border/40 mt-1">
+                {#if group.color}
+                  <span class="text-xs font-medium text-white rounded px-1.5 py-0.5" style="background:{group.color}">{group.label}</span>
+                {:else}
+                  <span class="text-xs font-semibold text-gray-400">{group.label}</span>
+                {/if}
+                <span class="text-xs text-gray-600">{group.tasks.length}</span>
+                {#if group.isDone && group.tasks.length > 0}
+                  {#if confirmArchiveAllDone === group.key}
+                    <span class="text-xs text-gray-500">Archive all?</span>
+                    <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={archiveAllDone}>Yes</button>
+                    <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => (confirmArchiveAllDone = null)}>No</button>
                   {:else}
-                    <span class="text-sm font-medium text-gray-300">{group.label}</span>
+                    <button class="text-xs text-gray-600 hover:text-gray-400 ml-1" onclick={() => (confirmArchiveAllDone = group.key)}>Archive all</button>
                   {/if}
-                  <span class="text-xs text-gray-500">{group.tasks.length}</span>
-                  {#if group.isDone && group.tasks.length > 0}
-                    {#if confirmArchiveAllDone === group.key}
-                      <span class="text-xs text-gray-500">Archive all?</span>
-                      <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={archiveAllDone}>Yes</button
-                      >
-                      <button
-                        class="text-xs text-gray-500 hover:text-gray-300"
-                        onclick={() => (confirmArchiveAllDone = null)}>No</button
-                      >
-                    {:else}
-                      <button
-                        class="text-xs text-gray-600 hover:text-gray-400 ml-1"
-                        onclick={() => (confirmArchiveAllDone = group.key)}>Archive all</button
-                      >
-                    {/if}
-                  {/if}
-                </div>
-
-                <div class="space-y-1">
-                  {#each group.tasks as task (task._id)}
-                    <TaskCard
-                      {task}
-                      {tasks}
-                      {statusConfig}
-                      selected={$selectedTaskId === task._id}
-                      onclick={() => ($selectedTaskId = task._id)}
-                      onUpdate={updateTask}
-                      onDelete={deleteTask}
-                    />
-                  {/each}
-                  {#if inlineAddGroup === group.key}
-                    <!-- svelte-ignore a11y_autofocus -->
-                    <input
-                      class="w-full bg-transparent text-sm text-gray-200 placeholder-gray-600 outline-none px-3 py-1.5 border border-border rounded"
-                      placeholder="Task title, then Enter…"
-                      bind:value={inlineAddTitle}
-                      autofocus
-                      onkeydown={async e => {
-                        if (e.key === "Enter") {
-                          const status = groupBy === "status" ? group.key : newTaskStatus
-                          await createQuickTask(inlineAddTitle, status)
-                          inlineAddTitle = ""
-                        }
-                        if (e.key === "Escape") {
-                          inlineAddGroup = null
-                          inlineAddTitle = ""
-                        }
-                      }}
-                      onblur={() => {
-                        inlineAddGroup = null
-                        inlineAddTitle = ""
-                      }}
-                    />
-                  {:else}
-                    <button
-                      class="text-xs text-gray-600 hover:text-gray-400 px-3 py-1.5 w-full text-left transition-colors"
-                      onclick={() => { inlineAddGroup = group.key; inlineAddTitle = "" }}
-                    >+ Add task</button>
-                  {/if}
-                </div>
+                {/if}
               </div>
+
+              <!-- Tasks -->
+              {#each group.tasks as task (task._id)}
+                <TaskCard
+                  {task}
+                  {tasks}
+                  {statusConfig}
+                  selected={$selectedTaskId === task._id}
+                  onclick={() => ($selectedTaskId = task._id)}
+                  onUpdate={updateTask}
+                  onDelete={deleteTask}
+                />
+              {/each}
+
+              <!-- Inline add task -->
+              {#if inlineAddGroup === group.key}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class="w-full bg-transparent text-sm text-gray-200 placeholder-gray-600 outline-none px-4 pl-9 py-1 border-b border-border/40"
+                  placeholder="Task title, then Enter…"
+                  bind:value={inlineAddTitle}
+                  autofocus
+                  onkeydown={async e => {
+                    if (e.key === "Enter") {
+                      const status = groupBy === "status" ? group.key : newTaskStatus
+                      await createQuickTask(inlineAddTitle, status)
+                      inlineAddTitle = ""
+                    }
+                    if (e.key === "Escape") {
+                      inlineAddGroup = null
+                      inlineAddTitle = ""
+                    }
+                  }}
+                  onblur={() => {
+                    inlineAddGroup = null
+                    inlineAddTitle = ""
+                  }}
+                />
+              {:else}
+                <button
+                  class="text-xs text-gray-600 hover:text-gray-400 px-4 pl-9 py-1 w-full text-left border-b border-border/40 transition-colors"
+                  onclick={() => { inlineAddGroup = group.key; inlineAddTitle = "" }}
+                >+ Add task</button>
+              {/if}
             {/if}
           {/each}
         </div>
