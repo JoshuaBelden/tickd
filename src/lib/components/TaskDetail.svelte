@@ -91,7 +91,20 @@
   const priorities = ["none", "low", "medium", "high", "urgent"] as const
 </script>
 
-<aside class="fixed inset-0 sm:static sm:inset-auto w-full sm:w-96 flex-shrink-0 border-l border-border bg-sidebar flex flex-col overflow-hidden z-10 sm:z-auto">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+  class="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50"
+  onclick={onClose}
+  onkeydown={e => e.key === "Escape" && onClose()}
+  role="dialog"
+  aria-modal="true"
+  tabindex="-1"
+>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="bg-sidebar border border-border flex flex-col overflow-hidden w-full h-full sm:w-4/5 sm:h-4/5 sm:rounded-lg"
+    onclick={e => e.stopPropagation()}
+  >
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
     <span class="text-xs text-gray-500">Task</span>
@@ -262,4 +275,5 @@
     <span class="text-xs text-gray-600">Created {formatDate(task.createdAt)}</span>
     <button class="text-xs text-red-500 hover:text-red-400" onclick={() => onDelete(task._id)}>Delete</button>
   </div>
-</aside>
+  </div>
+</div>

@@ -111,6 +111,7 @@
     tasks = [...tasks, task]
     newTaskTitle = ""
     showNewTask = false
+    $selectedTaskId = task._id
   }
 
   async function updateTask(taskId: string, updates: Partial<Task>) {
@@ -150,7 +151,7 @@
 
 <div class="flex h-full">
   <!-- Main Content -->
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
     <!-- Top bar -->
     <header class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
       <h1 class="font-semibold text-lg flex items-center gap-2 mr-1">
@@ -223,31 +224,6 @@
             {/if}
           {/each}
 
-          <!-- New task form -->
-          {#if showNewTask}
-            <div class="card flex items-center gap-3">
-              <select
-                class="text-xs bg-bg border border-border rounded px-2 py-1 text-gray-300"
-                bind:value={newTaskStatus}
-              >
-                {#each list.statusConfig as s (s.id)}
-                  <option value={s.id}>{s.name}</option>
-                {/each}
-              </select>
-              <input
-                class="flex-1 bg-transparent text-sm focus:outline-none placeholder-gray-500"
-                placeholder="Task title..."
-                bind:value={newTaskTitle}
-                onkeydown={e => {
-                  if (e.key === "Enter") createTask()
-                  if (e.key === "Escape") showNewTask = false
-                }}
-                autofocus
-              />
-              <button class="btn-primary text-xs" onclick={createTask}>Add</button>
-              <button class="btn-ghost text-xs" onclick={() => (showNewTask = false)}>Cancel</button>
-            </div>
-          {/if}
         </div>
       {:else}
         <!-- Map view -->
@@ -270,18 +246,56 @@
       {/if}
     </div>
   </div>
-
-  <!-- Task Detail Panel -->
-  {#if selectedTask}
-    <TaskDetail
-      task={selectedTask}
-      {tasks}
-      statusConfig={list.statusConfig}
-      {allTags}
-      onUpdate={updateTask}
-      onDelete={deleteTask}
-      onCreateSubtask={createSubtask}
-      onClose={() => ($selectedTaskId = null)}
-    />
-  {/if}
 </div>
+
+<!-- New Task Modal -->
+{#if showNewTask}
+  <div
+    class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+    onclick={() => (showNewTask = false)}
+    onkeydown={e => e.key === "Escape" && (showNewTask = false)}
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+  >
+    <div class="card w-full max-w-md space-y-4" onclick={e => e.stopPropagation()} role="presentation">
+      <h2 class="font-semibold">New Task</h2>
+      <input
+        class="input w-full"
+        placeholder="Task title..."
+        bind:value={newTaskTitle}
+        onkeydown={e => {
+          if (e.key === "Enter") createTask()
+          if (e.key === "Escape") showNewTask = false
+        }}
+        autofocus
+      />
+      <div>
+        <label class="text-xs text-gray-400 block mb-1">Status</label>
+        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300" bind:value={newTaskStatus}>
+          {#each list.statusConfig as s (s.id)}
+            <option value={s.id}>{s.name}</option>
+          {/each}
+        </select>
+      </div>
+      <div class="flex gap-2 justify-end pt-1">
+        <button class="btn-ghost" onclick={() => (showNewTask = false)}>Cancel</button>
+        <button class="btn-primary" onclick={createTask}>Add Task</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Task Detail Modal -->
+{#if selectedTask}
+  <TaskDetail
+    task={selectedTask}
+    {tasks}
+    statusConfig={list.statusConfig}
+    {allTags}
+    onUpdate={updateTask}
+    onDelete={deleteTask}
+    onCreateSubtask={createSubtask}
+    onClose={() => ($selectedTaskId = null)}
+  />
+{/if}
