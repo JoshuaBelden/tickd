@@ -47,7 +47,10 @@
     <aside class="w-60 flex-shrink-0 bg-sidebar border-r border-border flex flex-col">
       <!-- Logo -->
       <div class="p-4 border-b border-border">
-        <span class="font-bold text-lg tracking-tight">tickd</span>
+        <div class="flex items-center gap-2">
+          <img src="/images/logo.png" alt="" class="h-6 w-auto" />
+          <span class="font-bold text-lg tracking-tight">tickd</span>
+        </div>
       </div>
 
       <!-- Lists -->
