@@ -91,7 +91,7 @@
   const priorities = ["none", "low", "medium", "high", "urgent"] as const
 </script>
 
-<aside class="w-96 flex-shrink-0 border-l border-border bg-sidebar flex flex-col overflow-hidden">
+<aside class="fixed inset-0 sm:static sm:inset-auto w-full sm:w-96 flex-shrink-0 border-l border-border bg-sidebar flex flex-col overflow-hidden z-10 sm:z-auto">
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
     <span class="text-xs text-gray-500">Task</span>

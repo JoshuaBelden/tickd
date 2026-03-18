@@ -152,13 +152,13 @@
   <!-- Main Content -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Top bar -->
-    <header class="flex items-center gap-3 px-6 py-3 border-b border-border flex-shrink-0">
-      <h1 class="font-semibold text-lg flex items-center gap-2">
+    <header class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
+      <h1 class="font-semibold text-lg flex items-center gap-2 mr-1">
         <span>{list.icon}</span>
-        <span>{list.name}</span>
+        <span class="truncate max-w-[160px] sm:max-w-none">{list.name}</span>
       </h1>
 
-      <div class="flex items-center gap-1 ml-2 bg-surface rounded p-0.5 border border-border">
+      <div class="flex items-center gap-1 bg-surface rounded p-0.5 border border-border">
         <button
           class="px-2.5 py-1 text-xs rounded transition-colors {$viewMode === 'list'
             ? 'bg-white/10 text-white'
@@ -173,14 +173,14 @@
         >
       </div>
 
-      <div class="flex items-center gap-2 ml-auto">
+      <div class="flex items-center gap-2 ml-auto flex-wrap">
         <!-- Filters -->
-        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300" bind:value={groupBy}>
+        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300 hidden sm:block" bind:value={groupBy}>
           <option value="status">Group: Status</option>
           <option value="priority">Group: Priority</option>
           <option value="none">No grouping</option>
         </select>
-        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300" bind:value={sortBy}>
+        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300 hidden sm:block" bind:value={sortBy}>
           <option value="order">Sort: Manual</option>
           <option value="dueDate">Sort: Due Date</option>
           <option value="priority">Sort: Priority</option>
