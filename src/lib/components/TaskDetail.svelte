@@ -41,6 +41,8 @@
   let editingChecklistId = $state<string | null>(null)
   let editingChecklistTitle = $state("")
   let confirmDeleteChecklistId = $state<string | null>(null)
+  let clDragIndex = $state<Record<string, number | null>>({})
+  let clInsertIndex = $state<Record<string, number | null>>({})
   let confirmDeleteTask = $state(false)
   let confirmArchiveTask = $state(false)
   let showMoveList = $state(false)
@@ -123,6 +125,47 @@
       cl.id === checklistId ? { ...cl, items: cl.items.filter(item => item.id !== itemId) } : cl,
     )
     await onUpdate(task._id, { checklists: updated, checklist: [] })
+  }
+
+  function itemDragStart(e: DragEvent, checklistId: string, itemIndex: number) {
+    clDragIndex = { ...clDragIndex, [checklistId]: itemIndex }
+    e.dataTransfer!.effectAllowed = "move"
+  }
+
+  function itemDragOver(e: DragEvent, checklistId: string, itemIndex: number) {
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = "move"
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    clInsertIndex = {
+      ...clInsertIndex,
+      [checklistId]: e.clientY < rect.top + rect.height / 2 ? itemIndex : itemIndex + 1,
+    }
+  }
+
+  async function itemDrop(e: DragEvent, checklistId: string) {
+    e.preventDefault()
+    const dragIdx = clDragIndex[checklistId]
+    const insertIdx = clInsertIndex[checklistId]
+    if (dragIdx === null || dragIdx === undefined || insertIdx === null || insertIdx === undefined) return
+    if (insertIdx === dragIdx || insertIdx === dragIdx + 1) {
+      clDragIndex = { ...clDragIndex, [checklistId]: null }
+      clInsertIndex = { ...clInsertIndex, [checklistId]: null }
+      return
+    }
+    const cl = effectiveChecklists.find(c => c.id === checklistId)
+    if (!cl) return
+    const newItems = [...cl.items]
+    const [moved] = newItems.splice(dragIdx, 1)
+    newItems.splice(insertIdx > dragIdx ? insertIdx - 1 : insertIdx, 0, moved)
+    const updated = effectiveChecklists.map(c => (c.id === checklistId ? { ...c, items: newItems } : c))
+    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    clDragIndex = { ...clDragIndex, [checklistId]: null }
+    clInsertIndex = { ...clInsertIndex, [checklistId]: null }
+  }
+
+  function itemDragEnd(checklistId: string) {
+    clDragIndex = { ...clDragIndex, [checklistId]: null }
+    clInsertIndex = { ...clInsertIndex, [checklistId]: null }
   }
 
   function toggleShowCompleted(checklistId: string) {
@@ -284,6 +327,7 @@
         {@const doneCount = checklist.items.filter(i => i.checked).length}
         {@const totalCount = checklist.items.length}
         {@const showDone = showCompletedMap[checklist.id] ?? false}
+        {@const visibleItems = checklist.items.map((item, idx) => ({ item, idx })).filter(({ item }) => !item.checked || showDone)}
         <div>
           <div class="flex items-center justify-between mb-1.5">
             {#if editingChecklistId === checklist.id}
@@ -340,9 +384,27 @@
             </div>
           </div>
 
-          <div class="space-y-1 mb-2">
-            {#each checklist.items.filter(i => !i.checked || showDone) as item (item.id)}
-              <div class="flex items-center gap-2 group">
+          <div
+            class="space-y-1 mb-2"
+            ondragover={e => e.preventDefault()}
+            ondrop={e => itemDrop(e, checklist.id)}
+          >
+            {#each visibleItems as { item, idx } (item.id)}
+              {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === idx}
+                <div class="h-0.5 bg-accent rounded pointer-events-none my-0.5"></div>
+              {/if}
+              <div
+                class="flex items-center gap-2 group {clDragIndex[checklist.id] === idx ? 'opacity-40' : ''}"
+                draggable="true"
+                ondragstart={e => itemDragStart(e, checklist.id, idx)}
+                ondragover={e => itemDragOver(e, checklist.id, idx)}
+                ondragend={() => itemDragEnd(checklist.id)}
+              >
+                <span class="cursor-grab text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                    <path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+                  </svg>
+                </span>
                 <input
                   type="checkbox"
                   class="accent-accent"
@@ -356,6 +418,9 @@
                 >
               </div>
             {/each}
+            {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === checklist.items.length}
+              <div class="h-0.5 bg-accent rounded pointer-events-none my-0.5"></div>
+            {/if}
           </div>
 
           {#if doneCount > 0}
