@@ -16,6 +16,11 @@ export const DEFAULT_STATUSES: StatusConfig[] = [
   { id: "done", name: "Done", color: "#6366f1", isDone: true, order: 4 },
 ]
 
+export interface UserSettings {
+  userId: string
+  statusConfig: StatusConfig[]
+}
+
 export interface List {
   _id: string
   userId: string
@@ -23,7 +28,6 @@ export interface List {
   color: string
   icon: string
   order: number
-  statusConfig: StatusConfig[]
   archivedAt: string | null
   createdAt: string
   updatedAt: string

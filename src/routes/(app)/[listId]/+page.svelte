@@ -6,15 +6,18 @@
   import TaskCard from "$lib/components/TaskCard.svelte"
   import TaskDetail from "$lib/components/TaskDetail.svelte"
   import { selectedTaskId, showSearch, viewMode } from "$lib/stores/ui"
-  import type { GroupBy, SortField, Task } from "$lib/types"
+  import type { GroupBy, SortField, StatusConfig, Task } from "$lib/types"
   import { priorityOrder } from "$lib/utils"
-  import { untrack } from "svelte"
+  import { getContext, untrack } from "svelte"
 
   let { data } = $props()
 
   let tasks = $state<Task[]>(untrack(() => data.tasks))
   let allTags = $state<string[]>(untrack(() => data.allTags))
   let list = $state(untrack(() => data.list))
+
+  const statusConfigCtx = getContext<{ get: () => StatusConfig[] }>("statusConfig")
+  const statusConfig = $derived(statusConfigCtx.get())
 
   $effect(() => {
     tasks = data.tasks
@@ -24,7 +27,7 @@
 
   let showNewTask = $state(false)
   let newTaskTitle = $state("")
-  let newTaskStatus = $state(untrack(() => data.list.statusConfig[1]?.id ?? data.list.statusConfig[0]?.id ?? "todo"))
+  let newTaskStatus = $state(untrack(() => statusConfig[1]?.id ?? statusConfig[0]?.id ?? "todo"))
   let overlayTask = $state<Task | null>(null)
   let confirmArchiveAllDone = $state<string | null>(null)
 
@@ -104,7 +107,7 @@
       ]
 
     if (groupBy === "status") {
-      return list.statusConfig.map((s: import("$lib/types").StatusConfig) => ({
+      return statusConfig.map(s => ({
         key: s.id,
         label: s.name,
         color: s.color,
@@ -192,7 +195,7 @@
       body: JSON.stringify({ listId: data.list._id }),
     })
     if (res.ok) {
-      const doneStatusIds = list.statusConfig.filter(s => s.isDone).map(s => s.id)
+      const doneStatusIds = statusConfig.filter(s => s.isDone).map(s => s.id)
       tasks = tasks.filter(t => !doneStatusIds.includes(t.status))
       if ($selectedTaskId && !tasks.find(t => t._id === $selectedTaskId)) $selectedTaskId = null
     }
@@ -297,9 +300,10 @@
               <div>
                 <div class="flex items-center gap-2 mb-2">
                   {#if group.color}
-                    <span class="w-2 h-2 rounded-full" style="background:{group.color}"></span>
+                    <span class="text-xs font-medium text-white rounded px-2 py-0.5" style="background:{group.color}">{group.label}</span>
+                  {:else}
+                    <span class="text-sm font-medium text-gray-300">{group.label}</span>
                   {/if}
-                  <span class="text-sm font-medium text-gray-300">{group.label}</span>
                   <span class="text-xs text-gray-500">{group.tasks.length}</span>
                   {#if group.isDone && group.tasks.length > 0}
                     {#if confirmArchiveAllDone === group.key}
@@ -324,7 +328,7 @@
                     <TaskCard
                       {task}
                       {tasks}
-                      statusConfig={list.statusConfig}
+                      {statusConfig}
                       selected={$selectedTaskId === task._id}
                       onclick={() => ($selectedTaskId = task._id)}
                       onUpdate={updateTask}
@@ -369,7 +373,7 @@
         <BoardView
           tasks={filteredTasks}
           allTasks={tasks}
-          statusConfig={list.statusConfig}
+          {statusConfig}
           selectedTaskId={$selectedTaskId}
           onTaskClick={id => ($selectedTaskId = id)}
           onUpdate={updateTask}
@@ -384,6 +388,7 @@
             <MindMap
               {tasks}
               {list}
+              {statusConfig}
               onTaskClick={id => ($selectedTaskId = id)}
               onUpdatePosition={async (id, pos) => {
                 await fetch(`/api/tasks/${id}`, {
@@ -430,7 +435,7 @@
           class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300"
           bind:value={newTaskStatus}
         >
-          {#each list.statusConfig as s (s.id)}
+          {#each statusConfig as s (s.id)}
             <option value={s.id}>{s.name}</option>
           {/each}
         </select>
@@ -448,10 +453,10 @@
   <TaskDetail
     task={(overlayTask ?? selectedTask)!}
     {tasks}
-    statusConfig={list.statusConfig}
+    {statusConfig}
     {allTags}
     currentListId={data.list._id}
-    currentListStatusConfig={list.statusConfig}
+    currentListStatusConfig={statusConfig}
     onUpdate={updateTask}
     onDelete={deleteTask}
     onCreateSubtask={createSubtask}

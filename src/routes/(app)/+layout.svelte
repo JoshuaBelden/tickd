@@ -2,14 +2,23 @@
   import { goto } from "$app/navigation"
   import { page } from "$app/stores"
   import SearchModal from "$lib/components/SearchModal.svelte"
+  import SettingsModal from "$lib/components/SettingsModal.svelte"
   import { showSearch, sidebarOpen } from "$lib/stores/ui"
-  import type { List } from "$lib/types"
-  import { untrack } from "svelte"
+  import type { List, StatusConfig } from "$lib/types"
+  import { setContext, untrack } from "svelte"
 
   let { data, children } = $props()
 
   let lists = $state<List[]>(untrack(() => data.lists))
   let showNewList = $state(false)
+  let showSettings = $state(false)
+  let statusConfig = $state<StatusConfig[]>(untrack(() => data.statusConfig))
+
+  $effect(() => {
+    statusConfig = data.statusConfig
+  })
+
+  setContext("statusConfig", { get: () => statusConfig })
 
   function onGlobalKeyDown(e: KeyboardEvent) {
     if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -133,16 +142,36 @@
             {data.user.displayName?.[0]?.toUpperCase() ?? "U"}
           </div>
           <span class="text-sm text-gray-300 flex-1 truncate">{data.user.displayName}</span>
+          <button
+            class="text-gray-500 hover:text-gray-100 transition-colors"
+            onclick={() => (showSettings = true)}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+              <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.993 6.993 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+            </svg>
+          </button>
           <button class="text-gray-500 hover:text-gray-100 text-xs" onclick={logout}>Sign out</button>
         </div>
       {:else}
-        <div class="flex justify-center">
+        <div class="flex flex-col items-center gap-1">
           <div
             class="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-xs font-medium cursor-pointer"
             title={data.user.displayName}
           >
             {data.user.displayName?.[0]?.toUpperCase() ?? "U"}
           </div>
+          <button
+            class="text-gray-500 hover:text-gray-100 transition-colors"
+            onclick={() => (showSettings = true)}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+              <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.993 6.993 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+            </svg>
+          </button>
         </div>
       {/if}
     </div>
@@ -264,5 +293,13 @@
     currentListId={$page.params.listId ?? null}
     {lists}
     onClose={() => showSearch.set(false)}
+  />
+{/if}
+
+{#if showSettings}
+  <SettingsModal
+    {statusConfig}
+    onClose={() => (showSettings = false)}
+    onStatusConfigUpdated={updated => (statusConfig = updated)}
   />
 {/if}

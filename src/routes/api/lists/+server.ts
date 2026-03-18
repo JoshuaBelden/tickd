@@ -1,5 +1,4 @@
 import { getListsCollection } from "$lib/server/collections"
-import { DEFAULT_STATUSES } from "$lib/types"
 import { serializeDoc } from "$lib/utils"
 import { error, json } from "@sveltejs/kit"
 import { ObjectId } from "mongodb"
@@ -27,7 +26,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     color: body.color ?? "#6366f1",
     icon: body.icon ?? "📋",
     order: count,
-    statusConfig: DEFAULT_STATUSES,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

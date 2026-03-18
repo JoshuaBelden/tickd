@@ -1,12 +1,13 @@
 <script lang="ts">
-  import type { List, NodePosition, Task } from "$lib/types"
+  import type { List, NodePosition, StatusConfig, Task } from "$lib/types"
   import { Background, BackgroundVariant, Controls, MiniMap, SvelteFlow } from "@xyflow/svelte"
   import "@xyflow/svelte/dist/style.css"
   import { writable } from "svelte/store"
 
-  let { tasks, list, onTaskClick, onUpdatePosition } = $props<{
+  let { tasks, list, statusConfig, onTaskClick, onUpdatePosition } = $props<{
     tasks: Task[]
     list: List
+    statusConfig: StatusConfig[]
     onTaskClick: (id: string) => void
     onUpdatePosition: (id: string, pos: NodePosition) => Promise<void>
   }>()
@@ -33,7 +34,7 @@
       const x = hasPosition ? task.nodePosition!.x : 400 + radius * Math.cos(angleStep * i - Math.PI / 2)
       const y = hasPosition ? task.nodePosition!.y : 300 + radius * Math.sin(angleStep * i - Math.PI / 2)
 
-      const status = list.statusConfig.find((s: { id: string }) => s.id === task.status)
+      const status = statusConfig.find((s: { id: string }) => s.id === task.status)
 
       nodes.push({
         id: task._id,
@@ -55,7 +56,7 @@
         const subAngle = angleStep * i - Math.PI / 2 + (j - (subtasks.length - 1) / 2) * 0.4
         const subX = sub.nodePosition?.x ?? x + 160 * Math.cos(subAngle)
         const subY = sub.nodePosition?.y ?? y + 160 * Math.sin(subAngle)
-        const subStatus = list.statusConfig.find((s: { id: string }) => s.id === sub.status)
+        const subStatus = statusConfig.find((s: { id: string }) => s.id === sub.status)
 
         nodes.push({
           id: sub._id,

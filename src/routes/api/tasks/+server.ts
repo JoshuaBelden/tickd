@@ -1,4 +1,5 @@
-import { getListsCollection, getTasksCollection } from "$lib/server/collections"
+import { getListsCollection, getTasksCollection, getUserSettingsCollection } from "$lib/server/collections"
+import { DEFAULT_STATUSES } from "$lib/types"
 import { serializeDoc } from "$lib/utils"
 import { error, json } from "@sveltejs/kit"
 import { ObjectId } from "mongodb"
@@ -31,6 +32,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const list = await listsCol.findOne({ _id: listOid as any, userId: locals.user.id })
   if (!list) throw error(404, "List not found")
 
+  const settingsCol = await getUserSettingsCollection()
+  const settings = await settingsCol.findOne({ userId: locals.user.id })
+  const statusConfig = settings?.statusConfig ?? DEFAULT_STATUSES
+
   const col = await getTasksCollection()
   const count = await col.countDocuments({
     listId: body.listId,
@@ -45,7 +50,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     parentId: body.parentId ?? null,
     title: body.title.trim(),
     description: null,
-    status: body.status ?? list.statusConfig[0]?.id ?? "backlog",
+    status: body.status ?? statusConfig[0]?.id ?? "backlog",
     priority: body.priority ?? "none",
     dueDate: body.dueDate ?? null,
     tags: body.tags ?? [],

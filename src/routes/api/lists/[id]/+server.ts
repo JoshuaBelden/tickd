@@ -14,7 +14,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
   }
 
   const body = await request.json()
-  const allowed = ["name", "color", "icon", "order", "statusConfig", "archivedAt"]
+  const allowed = ["name", "color", "icon", "order", "archivedAt"]
   const updates: Record<string, any> = { updatedAt: new Date() }
   for (const k of allowed) if (body[k] !== undefined) updates[k] = body[k]
 

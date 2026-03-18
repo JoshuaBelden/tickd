@@ -13,8 +13,8 @@
 </script>
 
 <span
-  class="inline-flex items-center gap-1 text-xs rounded px-2 py-0.5"
-  style="background:{info?.color}22;color:{info?.color}"
+  class="inline-flex items-center text-xs font-medium text-white rounded px-2 py-0.5"
+  style="background:{info?.color ?? '#888'}"
 >
   {info?.name ?? status}
 </span>

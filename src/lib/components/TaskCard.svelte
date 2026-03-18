@@ -86,10 +86,8 @@
   <!-- Status indicator -->
   <div class="relative flex-shrink-0">
     <button
-      class="w-4 h-4 rounded-full border-2 transition-colors hover:opacity-80"
-      style="border-color: {statusInfo?.color ?? '#888'}; background: {isDone
-        ? (statusInfo?.color ?? '#888')
-        : 'transparent'}"
+      class="w-2.5 h-2.5 rounded-full transition-colors hover:opacity-80"
+      style="background: {statusInfo?.color ?? '#888'}"
       onclick={openStatusMenu}
       title="Change status"
     ></button>
