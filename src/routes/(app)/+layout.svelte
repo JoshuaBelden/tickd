@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation"
   import { page } from "$app/stores"
+  import HeroIcon from "$lib/components/HeroIcon.svelte"
   import SearchModal from "$lib/components/SearchModal.svelte"
   import SettingsModal from "$lib/components/SettingsModal.svelte"
+  import { ICON_NAMES, DEFAULT_ICON } from "$lib/icons"
   import { showSearch, sidebarOpen } from "$lib/stores/ui"
   import type { List, StatusConfig } from "$lib/types"
   import { setContext, untrack } from "svelte"
@@ -13,6 +15,10 @@
   let showNewList = $state(false)
   let showSettings = $state(false)
   let statusConfig = $state<StatusConfig[]>(untrack(() => data.statusConfig))
+  let editingList = $state<List | null>(null)
+  let editName = $state("")
+  let editColor = $state("")
+  let editIcon = $state("")
 
   $effect(() => {
     statusConfig = data.statusConfig
@@ -28,15 +34,14 @@
   }
   let newListName = $state("")
   let newListColor = $state("#6366f1")
-  let newListIcon = $state("📋")
+  let newListIcon = $state(DEFAULT_ICON)
 
   // Update lists when data changes
   $effect(() => {
     lists = data.lists
   })
 
-  const listColors = ["#6366f1", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6"]
-  const listIcons = ["📋", "📌", "🏠", "💼", "🎮", "❤️", "⭐", "🚀", "📚", "🎯"]
+  const listColors = ["#6366f1", "#3b82f6", "#06b6d4", "#10b981", "#84cc16", "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#8b5cf6", "#a855f7", "#6b7280"]
 
   async function createList() {
     if (!newListName.trim()) return
@@ -50,6 +55,68 @@
     showNewList = false
     newListName = ""
     goto(`/${list._id}`)
+  }
+
+  function startEdit(list: List) {
+    editingList = list
+    editName = list.name
+    editColor = list.color
+    editIcon = list.icon
+  }
+
+  async function saveEdit() {
+    if (!editingList || !editName.trim()) return
+    const res = await fetch(`/api/lists/${editingList._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName.trim(), color: editColor, icon: editIcon }),
+    })
+    const updated = await res.json()
+    lists = lists.map(l => (l._id === updated._id ? updated : l))
+    editingList = null
+  }
+
+  let dragIndex = $state<number | null>(null)
+  let insertIndex = $state<number | null>(null)
+
+  function onDragStart(e: DragEvent, idx: number) {
+    dragIndex = idx
+    e.dataTransfer!.effectAllowed = "move"
+  }
+
+  function onDragOver(e: DragEvent, idx: number) {
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = "move"
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    insertIndex = e.clientY < rect.top + rect.height / 2 ? idx : idx + 1
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault()
+    if (dragIndex === null || insertIndex === null) return
+    if (insertIndex === dragIndex || insertIndex === dragIndex + 1) {
+      dragIndex = null
+      insertIndex = null
+      return
+    }
+    const newLists = [...lists]
+    const [moved] = newLists.splice(dragIndex, 1)
+    newLists.splice(insertIndex > dragIndex ? insertIndex - 1 : insertIndex, 0, moved)
+    lists = newLists.map((l, i) => ({ ...l, order: i }))
+    dragIndex = null
+    insertIndex = null
+    Promise.all(lists.map((l, i) =>
+      fetch(`/api/lists/${l._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: i }),
+      })
+    ))
+  }
+
+  function onDragEnd() {
+    dragIndex = null
+    insertIndex = null
   }
 
   async function logout() {
@@ -101,29 +168,57 @@
         </div>
       {/if}
 
-      {#each lists as list (list._id)}
-        <a
-          href="/{list._id}"
-          class="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-white/5 transition-colors {$page.params
-            .listId === list._id
-            ? 'bg-white/10 text-white'
-            : 'text-gray-400'} {$sidebarOpen ? '' : 'justify-center px-0'}"
-          title={$sidebarOpen ? undefined : list.name}
-          onclick={() => {
-            if (window.innerWidth < 1024) {
-              sidebarOpen.set(false)  // mobile: close overlay after navigation
-            } else if (!$sidebarOpen) {
-              sidebarOpen.set(true)   // desktop: expand collapsed icon nav
-            }
-          }}
+      {#each lists as list, i (list._id)}
+        {#if dragIndex !== null && insertIndex === i}
+          <div class="h-0.5 bg-accent rounded mx-1 my-0.5 pointer-events-none"></div>
+        {/if}
+        <div
+          class="relative group {dragIndex === i ? 'opacity-40' : ''}"
+          draggable="true"
+          ondragstart={e => onDragStart(e, i)}
+          ondragover={e => onDragOver(e, i)}
+          ondrop={onDrop}
+          ondragend={onDragEnd}
         >
-          <span class="text-base leading-none">{list.icon}</span>
+          <a
+            href="/{list._id}"
+            class="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-white/5 transition-colors {$page.params
+              .listId === list._id
+              ? 'bg-white/10 text-white'
+              : 'text-gray-400'} {$sidebarOpen ? 'pr-8' : 'justify-center px-0'}"
+            title={$sidebarOpen ? undefined : list.name}
+            onclick={() => {
+              if (window.innerWidth < 1024) {
+                sidebarOpen.set(false)
+              } else if (!$sidebarOpen) {
+                sidebarOpen.set(true)
+              }
+            }}
+          >
+            <HeroIcon name={list.icon} class="w-4 h-4 flex-shrink-0" style="color:{list.color}" />
+            {#if $sidebarOpen}
+              <span class="flex-1 truncate">{list.name}</span>
+            {/if}
+          </a>
           {#if $sidebarOpen}
-            <span class="flex-1 truncate">{list.name}</span>
-            <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:{list.color}"></span>
+            <div class="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-sidebar rounded px-0.5">
+              <button
+                class="p-0.5 text-gray-500 hover:text-gray-200 transition-colors"
+                onclick={e => { e.preventDefault(); startEdit(list) }}
+                title="Edit list"
+                aria-label="Edit list"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+                  <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.263a1.75 1.75 0 0 0 0-2.474ZM4.75 14.25h6.5a.75.75 0 0 0 0-1.5h-6.5a.75.75 0 0 0 0 1.5Z" />
+                </svg>
+              </button>
+            </div>
           {/if}
-        </a>
+        </div>
       {/each}
+      {#if dragIndex !== null && insertIndex === lists.length}
+        <div class="h-0.5 bg-accent rounded mx-1 my-0.5 pointer-events-none"></div>
+      {/if}
 
       {#if !$sidebarOpen}
         <button
@@ -270,12 +365,15 @@
         </div>
         <div>
           <span class="text-xs text-gray-400 block mb-1">Icon</span>
-          <div class="flex gap-2 flex-wrap">
-            {#each listIcons as i}
+          <div class="grid grid-cols-7 gap-1">
+            {#each ICON_NAMES as i}
               <button
-                class="text-lg p-1 rounded {newListIcon === i ? 'bg-white/20' : 'hover:bg-white/10'}"
-                onclick={() => (newListIcon = i)}>{i}</button
+                class="p-1.5 rounded flex items-center justify-center {newListIcon === i ? 'bg-white/20' : 'hover:bg-white/10'}"
+                onclick={() => (newListIcon = i)}
+                title={i}
               >
+                <HeroIcon name={i} class="w-5 h-5" style="color:{newListColor}" />
+              </button>
             {/each}
           </div>
         </div>
@@ -294,6 +392,60 @@
     {lists}
     onClose={() => showSearch.set(false)}
   />
+{/if}
+
+{#if editingList}
+  <div
+    class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+    onclick={() => (editingList = null)}
+    onkeydown={e => e.key === "Escape" && (editingList = null)}
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+  >
+    <div class="card w-full max-w-sm" onclick={e => e.stopPropagation()} role="presentation">
+      <h2 class="font-semibold mb-4">Edit List</h2>
+      <div class="space-y-3">
+        <input
+          class="input"
+          placeholder="List name"
+          bind:value={editName}
+          onkeydown={e => e.key === "Enter" && saveEdit()}
+        />
+        <div>
+          <span class="text-xs text-gray-400 block mb-1">Color</span>
+          <div class="flex gap-2 flex-wrap">
+            {#each listColors as c}
+              <button
+                class="w-6 h-6 rounded-full border-2 transition-all {editColor === c ? 'border-white scale-110' : 'border-transparent'}"
+                style="background:{c}"
+                aria-label="Select color {c}"
+                onclick={() => (editColor = c)}
+              ></button>
+            {/each}
+          </div>
+        </div>
+        <div>
+          <span class="text-xs text-gray-400 block mb-1">Icon</span>
+          <div class="grid grid-cols-7 gap-1">
+            {#each ICON_NAMES as i}
+              <button
+                class="p-1.5 rounded flex items-center justify-center {editIcon === i ? 'bg-white/20' : 'hover:bg-white/10'}"
+                onclick={() => (editIcon = i)}
+                title={i}
+              >
+                <HeroIcon name={i} class="w-5 h-5" style="color:{editColor}" />
+              </button>
+            {/each}
+          </div>
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+          <button class="btn-ghost" onclick={() => (editingList = null)}>Cancel</button>
+          <button class="btn-primary" onclick={saveEdit}>Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
 {/if}
 
 {#if showSettings}

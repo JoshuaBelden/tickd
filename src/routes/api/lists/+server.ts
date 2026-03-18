@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     userId: locals.user.id,
     name: body.name.trim(),
     color: body.color ?? "#6366f1",
-    icon: body.icon ?? "📋",
+    icon: body.icon ?? "document-text",
     order: count,
     archivedAt: null,
     createdAt: new Date(),
