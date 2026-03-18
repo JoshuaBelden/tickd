@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation"
   import { page } from "$app/stores"
   import BoardView from "$lib/components/BoardView.svelte"
+  import HeroIcon from "$lib/components/HeroIcon.svelte"
   import TaskCard from "$lib/components/TaskCard.svelte"
   import TaskDetail from "$lib/components/TaskDetail.svelte"
   import { selectedTaskId, showSearch, viewMode } from "$lib/stores/ui"
@@ -231,7 +232,7 @@
     <!-- Top bar -->
     <header class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
       <h1 class="font-semibold text-lg flex items-center gap-2 mr-1">
-        <span>{list.icon}</span>
+        <HeroIcon name={list.icon} class="w-5 h-5 flex-shrink-0" style="color:{list.color}" />
         <span class="truncate max-w-[160px] sm:max-w-none">{list.name}</span>
       </h1>
 
