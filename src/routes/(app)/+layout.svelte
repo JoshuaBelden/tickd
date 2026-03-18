@@ -190,8 +190,6 @@
             onclick={() => {
               if (window.innerWidth < 1024) {
                 sidebarOpen.set(false)
-              } else if (!$sidebarOpen) {
-                sidebarOpen.set(true)
               }
             }}
           >
