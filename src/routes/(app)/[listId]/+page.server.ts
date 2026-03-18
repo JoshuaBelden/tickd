@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   if (!list) throw error(404, "List not found")
 
   const tasksCol = await getTasksCollection()
-  const tasks = await tasksCol.find({ listId: params.listId, userId: locals.user.id }).sort({ order: 1 }).toArray()
+  const tasks = await tasksCol.find({ listId: params.listId, userId: locals.user.id, archivedAt: null }).sort({ order: 1 }).toArray()
 
   // Get all tags for autocomplete
   const allTagsResult = await tasksCol.distinct("tags", { userId: locals.user.id })

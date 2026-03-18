@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   if (!listId) throw error(400, "listId required")
 
   const col = await getTasksCollection()
-  const tasks = await col.find({ listId, userId: locals.user.id }).sort({ order: 1 }).toArray()
+  const tasks = await col.find({ listId, userId: locals.user.id, archivedAt: null }).sort({ order: 1 }).toArray()
   return json(tasks.map(serializeDoc))
 }
 
@@ -50,8 +50,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     dueDate: body.dueDate ?? null,
     tags: body.tags ?? [],
     checklist: [],
+    checklists: [],
     order: count,
     nodePosition: null,
+    archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   }

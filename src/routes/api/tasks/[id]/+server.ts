@@ -42,6 +42,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
     "nodePosition",
     "listId",
     "parentId",
+    "archivedAt",
   ]
   const updates: Record<string, any> = { updatedAt: new Date() }
   for (const k of allowed) if (body[k] !== undefined) updates[k] = body[k]

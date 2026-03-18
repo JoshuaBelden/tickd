@@ -15,3 +15,5 @@ function persistedWritable<T>(key: string, initial: T) {
 }
 
 export const sidebarOpen = persistedWritable("sidebarOpen", true)
+
+export const showSearch = writable(false)

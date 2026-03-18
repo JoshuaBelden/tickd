@@ -1,9 +1,11 @@
 <script lang="ts">
   import { browser } from "$app/environment"
+  import { goto } from "$app/navigation"
+  import { page } from "$app/stores"
   import BoardView from "$lib/components/BoardView.svelte"
   import TaskCard from "$lib/components/TaskCard.svelte"
   import TaskDetail from "$lib/components/TaskDetail.svelte"
-  import { selectedTaskId, viewMode } from "$lib/stores/ui"
+  import { selectedTaskId, showSearch, viewMode } from "$lib/stores/ui"
   import type { GroupBy, SortField, Task } from "$lib/types"
   import { priorityOrder } from "$lib/utils"
   import { untrack } from "svelte"
@@ -23,6 +25,8 @@
   let showNewTask = $state(false)
   let newTaskTitle = $state("")
   let newTaskStatus = $state(untrack(() => data.list.statusConfig[1]?.id ?? data.list.statusConfig[0]?.id ?? "todo"))
+  let overlayTask = $state<Task | null>(null)
+  let confirmArchiveAllDone = $state<string | null>(null)
 
   // Filters
   let filterStatus = $state<string | null>(null)
@@ -38,9 +42,29 @@
     }
     if (e.key === "Escape") {
       $selectedTaskId = null
+      overlayTask = null
       showNewTask = false
     }
   }
+
+  // Handle ?task=<id> URL param (from cross-list search navigation)
+  $effect(() => {
+    const taskId = $page.url.searchParams.get("task")
+    if (!taskId) return
+    // Clean the URL immediately
+    goto(`/${data.list._id}`, { replaceState: true, noScroll: true })
+    const found = tasks.find(t => t._id === taskId)
+    if (found) {
+      $selectedTaskId = taskId
+    } else {
+      // Task is archived or from another list — fetch it directly
+      fetch(`/api/tasks/${taskId}`)
+        .then(r => r.json())
+        .then(t => {
+          overlayTask = t
+        })
+    }
+  })
 
   let selectedTask = $derived(tasks.find(t => t._id === $selectedTaskId) ?? null)
 
@@ -122,13 +146,38 @@
       body: JSON.stringify(updates),
     })
     const updated = await res.json()
-    tasks = tasks.map(t => (t._id === taskId ? { ...t, ...updated } : t))
+    if (updated.archivedAt !== null && updated.archivedAt !== undefined) {
+      // Task was archived — remove from local state and close detail
+      tasks = tasks.filter(t => t._id !== taskId)
+      if ($selectedTaskId === taskId) $selectedTaskId = null
+    } else if (overlayTask?._id === taskId) {
+      // Task was unarchived from overlay (e.g. moved to this list) — add to tasks
+      overlayTask = null
+      tasks = [...tasks, updated]
+      $selectedTaskId = updated._id
+    } else {
+      tasks = tasks.map(t => (t._id === taskId ? { ...t, ...updated } : t))
+    }
   }
 
   async function deleteTask(taskId: string) {
     await fetch(`/api/tasks/${taskId}`, { method: "DELETE" })
     tasks = tasks.filter(t => t._id !== taskId && t.parentId !== taskId)
     if ($selectedTaskId === taskId) $selectedTaskId = null
+  }
+
+  async function archiveAllDone() {
+    const res = await fetch("/api/tasks/archive-done", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listId: data.list._id }),
+    })
+    if (res.ok) {
+      const doneStatusIds = list.statusConfig.filter(s => s.isDone).map(s => s.id)
+      tasks = tasks.filter(t => !doneStatusIds.includes(t.status))
+      if ($selectedTaskId && !tasks.find(t => t._id === $selectedTaskId)) $selectedTaskId = null
+    }
+    confirmArchiveAllDone = null
   }
 
   async function createSubtask(parentId: string, title: string) {
@@ -182,13 +231,34 @@
       </div>
 
       <div class="flex items-center gap-2 ml-auto flex-wrap">
+        <!-- Search icon (desktop only — mobile has it in the layout header) -->
+        <button
+          class="hidden sm:flex text-gray-500 hover:text-gray-100 transition-colors"
+          onclick={() => showSearch.set(true)}
+          aria-label="Search tasks"
+          title="Search (⌘K)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+            <path
+              fill-rule="evenodd"
+              d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
         <!-- Filters -->
-        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300 hidden sm:block" bind:value={groupBy}>
+        <select
+          class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300 hidden sm:block"
+          bind:value={groupBy}
+        >
           <option value="status">Group: Status</option>
           <option value="priority">Group: Priority</option>
           <option value="none">No grouping</option>
         </select>
-        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300 hidden sm:block" bind:value={sortBy}>
+        <select
+          class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300 hidden sm:block"
+          bind:value={sortBy}
+        >
           <option value="order">Sort: Manual</option>
           <option value="dueDate">Sort: Due Date</option>
           <option value="priority">Sort: Priority</option>
@@ -212,6 +282,22 @@
                   {/if}
                   <span class="text-sm font-medium text-gray-300">{group.label}</span>
                   <span class="text-xs text-gray-500">{group.tasks.length}</span>
+                  {#if group.isDone && group.tasks.length > 0}
+                    {#if confirmArchiveAllDone === group.key}
+                      <span class="text-xs text-gray-500">Archive all?</span>
+                      <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={archiveAllDone}>Yes</button
+                      >
+                      <button
+                        class="text-xs text-gray-500 hover:text-gray-300"
+                        onclick={() => (confirmArchiveAllDone = null)}>No</button
+                      >
+                    {:else}
+                      <button
+                        class="text-xs text-gray-600 hover:text-gray-400 ml-1"
+                        onclick={() => (confirmArchiveAllDone = group.key)}>Archive all</button
+                      >
+                    {/if}
+                  {/if}
                 </div>
 
                 <div class="space-y-1">
@@ -230,7 +316,6 @@
               </div>
             {/if}
           {/each}
-
         </div>
       {:else if $viewMode === "board"}
         <BoardView
@@ -241,6 +326,7 @@
           onTaskClick={id => ($selectedTaskId = id)}
           onUpdate={updateTask}
           onDelete={deleteTask}
+          onArchiveAllDone={archiveAllDone}
         />
       {:else}
         <!-- Map view -->
@@ -290,7 +376,11 @@
       />
       <div>
         <label class="text-xs text-gray-400 block mb-1" for="new-task-status">Status</label>
-        <select id="new-task-status" class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300" bind:value={newTaskStatus}>
+        <select
+          id="new-task-status"
+          class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300"
+          bind:value={newTaskStatus}
+        >
           {#each list.statusConfig as s (s.id)}
             <option value={s.id}>{s.name}</option>
           {/each}
@@ -305,15 +395,20 @@
 {/if}
 
 <!-- Task Detail Modal -->
-{#if selectedTask}
+{#if overlayTask ?? selectedTask}
   <TaskDetail
-    task={selectedTask}
+    task={(overlayTask ?? selectedTask)!}
     {tasks}
     statusConfig={list.statusConfig}
     {allTags}
+    currentListId={data.list._id}
+    currentListStatusConfig={list.statusConfig}
     onUpdate={updateTask}
     onDelete={deleteTask}
     onCreateSubtask={createSubtask}
-    onClose={() => ($selectedTaskId = null)}
+    onClose={() => {
+      $selectedTaskId = null
+      overlayTask = null
+    }}
   />
 {/if}

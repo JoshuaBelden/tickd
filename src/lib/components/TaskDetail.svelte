@@ -10,6 +10,8 @@
     tasks,
     statusConfig,
     allTags,
+    currentListId,
+    currentListStatusConfig,
     onUpdate,
     onDelete,
     onCreateSubtask,
@@ -19,6 +21,8 @@
     tasks: Task[]
     statusConfig: StatusConfig[]
     allTags: string[]
+    currentListId: string
+    currentListStatusConfig: StatusConfig[]
     onUpdate: (id: string, updates: Partial<Task>) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onCreateSubtask: (parentId: string, title: string) => Promise<void>
@@ -36,6 +40,7 @@
   let editingChecklistTitle = $state("")
   let confirmDeleteChecklistId = $state<string | null>(null)
   let confirmDeleteTask = $state(false)
+  let confirmArchiveTask = $state(false)
 
   $effect(() => {
     titleValue = task.title
@@ -400,17 +405,33 @@
   </div>
 
   <!-- Footer -->
-  <div class="px-4 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
+  <div class="px-4 py-3 border-t border-border flex-shrink-0 flex items-center justify-between gap-4">
     <span class="text-xs text-gray-600">Created {formatDate(task.createdAt)}</span>
-    {#if confirmDeleteTask}
-      <span class="flex items-center gap-2">
-        <span class="text-xs text-gray-500">Delete this task?</span>
-        <button class="text-xs text-red-400 hover:text-red-300" onclick={() => onDelete(task._id)}>Yes, delete</button>
-        <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmDeleteTask = false}>Cancel</button>
-      </span>
-    {:else}
-      <button class="text-xs text-red-500 hover:text-red-400" onclick={() => confirmDeleteTask = true}>Delete</button>
-    {/if}
+    <div class="flex items-center gap-3">
+      {#if task.archivedAt !== null}
+        <button
+          class="text-xs text-gray-400 hover:text-gray-100"
+          onclick={() => onUpdate(task._id, { archivedAt: null, listId: currentListId, status: currentListStatusConfig[0]?.id ?? task.status })}
+        >Unarchive to this list</button>
+      {:else if confirmArchiveTask}
+        <span class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">Archive this task?</span>
+          <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={() => { confirmArchiveTask = false; onUpdate(task._id, { archivedAt: new Date().toISOString() }) }}>Yes</button>
+          <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmArchiveTask = false}>No</button>
+        </span>
+      {:else}
+        <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmArchiveTask = true}>Archive</button>
+      {/if}
+      {#if confirmDeleteTask}
+        <span class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">Delete this task?</span>
+          <button class="text-xs text-red-400 hover:text-red-300" onclick={() => onDelete(task._id)}>Yes, delete</button>
+          <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmDeleteTask = false}>Cancel</button>
+        </span>
+      {:else}
+        <button class="text-xs text-red-500 hover:text-red-400" onclick={() => confirmDeleteTask = true}>Delete</button>
+      {/if}
+    </div>
   </div>
   </div>
 </div>

@@ -61,9 +61,17 @@ export interface Task {
   checklists: Checklist[]
   order: number
   nodePosition: NodePosition | null
+  archivedAt: string | null
   createdAt: string
   updatedAt: string
   subtasks?: Task[]
+}
+
+export interface TaskSearchResult extends Task {
+  listName: string
+  listIcon: string
+  listColor: string
+  listDeleted: boolean
 }
 
 export interface FilterState {

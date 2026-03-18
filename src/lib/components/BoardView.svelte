@@ -10,6 +10,7 @@
     onTaskClick,
     onUpdate,
     onDelete,
+    onArchiveAllDone,
   }: {
     tasks: Task[]
     allTasks: Task[]
@@ -18,6 +19,7 @@
     onTaskClick: (id: string) => void
     onUpdate: (id: string, updates: Partial<Task>) => Promise<void>
     onDelete: (id: string) => Promise<void>
+    onArchiveAllDone: () => Promise<void>
   } = $props()
 
   let draggedTaskId = $state<string | null>(null)
@@ -89,6 +91,7 @@
   }
 
   let confirmDeleteId = $state<string | null>(null)
+  let confirmArchiveAllDoneCol = $state<string | null>(null)
 </script>
 
 <div class="flex gap-4 p-6 h-full overflow-x-auto items-start">
@@ -125,6 +128,15 @@
           <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{col.color}"></span>
           <span class="text-sm font-medium text-gray-200">{col.name}</span>
           <span class="text-xs text-gray-500 ml-auto tabular-nums">{col.tasks.length}</span>
+          {#if col.isDone && col.tasks.length > 0}
+            {#if confirmArchiveAllDoneCol === col.id}
+              <span class="text-xs text-gray-500">Archive all?</span>
+              <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={async e => { e.stopPropagation(); await onArchiveAllDone(); confirmArchiveAllDoneCol = null }}>Yes</button>
+              <button class="text-xs text-gray-500 hover:text-gray-300" onclick={e => { e.stopPropagation(); confirmArchiveAllDoneCol = null }}>No</button>
+            {:else}
+              <button class="text-xs text-gray-600 hover:text-gray-400" onclick={e => { e.stopPropagation(); confirmArchiveAllDoneCol = col.id }}>Archive all</button>
+            {/if}
+          {/if}
           <button
             class="text-gray-600 hover:text-gray-300 transition-colors ml-1 text-xs leading-none"
             onclick={() => toggleCollapsed(col.id)}

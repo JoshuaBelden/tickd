@@ -1,7 +1,8 @@
 <script lang="ts">
   import { goto } from "$app/navigation"
   import { page } from "$app/stores"
-  import { sidebarOpen } from "$lib/stores/ui"
+  import SearchModal from "$lib/components/SearchModal.svelte"
+  import { showSearch, sidebarOpen } from "$lib/stores/ui"
   import type { List } from "$lib/types"
   import { untrack } from "svelte"
 
@@ -9,6 +10,13 @@
 
   let lists = $state<List[]>(untrack(() => data.lists))
   let showNewList = $state(false)
+
+  function onGlobalKeyDown(e: KeyboardEvent) {
+    if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      showSearch.update(v => !v)
+    }
+  }
   let newListName = $state("")
   let newListColor = $state("#6366f1")
   let newListIcon = $state("📋")
@@ -40,6 +48,8 @@
     goto("/auth/login")
   }
 </script>
+
+<svelte:window onkeydown={onGlobalKeyDown} />
 
 <div class="flex h-screen overflow-hidden">
   <!-- Mobile backdrop -->
@@ -90,6 +100,13 @@
             ? 'bg-white/10 text-white'
             : 'text-gray-400'} {$sidebarOpen ? '' : 'justify-center px-0'}"
           title={$sidebarOpen ? undefined : list.name}
+          onclick={() => {
+            if (window.innerWidth < 1024) {
+              sidebarOpen.set(false)  // mobile: close overlay after navigation
+            } else if (!$sidebarOpen) {
+              sidebarOpen.set(true)   // desktop: expand collapsed icon nav
+            }
+          }}
         >
           <span class="text-base leading-none">{list.icon}</span>
           {#if $sidebarOpen}
@@ -171,6 +188,15 @@
       </button>
       <img src="/images/logo.png" alt="tickd" class="h-5 w-auto" />
       <span class="font-bold tracking-tight">tickd</span>
+      <button
+        class="ml-auto text-gray-400 hover:text-gray-100 transition-colors"
+        onclick={() => showSearch.set(true)}
+        aria-label="Search tasks"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+          <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+        </svg>
+      </button>
     </div>
 
     <div class="flex-1 overflow-hidden">
@@ -231,4 +257,12 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if $showSearch}
+  <SearchModal
+    currentListId={$page.params.listId ?? null}
+    {lists}
+    onClose={() => showSearch.set(false)}
+  />
 {/if}
