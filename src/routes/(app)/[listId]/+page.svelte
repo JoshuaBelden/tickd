@@ -260,6 +260,7 @@
   >
     <div class="card w-full max-w-md space-y-4" onclick={e => e.stopPropagation()} role="presentation">
       <h2 class="font-semibold">New Task</h2>
+      <!-- svelte-ignore a11y_autofocus -->
       <input
         class="input w-full"
         placeholder="Task title..."
@@ -271,8 +272,8 @@
         autofocus
       />
       <div>
-        <label class="text-xs text-gray-400 block mb-1">Status</label>
-        <select class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300" bind:value={newTaskStatus}>
+        <label class="text-xs text-gray-400 block mb-1" for="new-task-status">Status</label>
+        <select id="new-task-status" class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300" bind:value={newTaskStatus}>
           {#each list.statusConfig as s (s.id)}
             <option value={s.id}>{s.name}</option>
           {/each}

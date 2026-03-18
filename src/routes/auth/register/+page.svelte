@@ -16,16 +16,16 @@
         <p class="text-red-400 text-sm">{form.error}</p>
       {/if}
       <div>
-        <label class="text-xs text-gray-400 block mb-1">Display Name</label>
-        <input class="input" type="text" name="displayName" required />
+        <label class="text-xs text-gray-400 block mb-1" for="reg-displayName">Display Name</label>
+        <input id="reg-displayName" class="input" type="text" name="displayName" required />
       </div>
       <div>
-        <label class="text-xs text-gray-400 block mb-1">Email</label>
-        <input class="input" type="email" name="email" required autocomplete="email" />
+        <label class="text-xs text-gray-400 block mb-1" for="reg-email">Email</label>
+        <input id="reg-email" class="input" type="email" name="email" required autocomplete="email" />
       </div>
       <div>
-        <label class="text-xs text-gray-400 block mb-1">Password</label>
-        <input class="input" type="password" name="password" required minlength="8" autocomplete="new-password" />
+        <label class="text-xs text-gray-400 block mb-1" for="reg-password">Password</label>
+        <input id="reg-password" class="input" type="password" name="password" required minlength="8" autocomplete="new-password" />
       </div>
       <button class="btn-primary w-full">Create Account</button>
     </form>

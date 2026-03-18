@@ -69,8 +69,7 @@
 </script>
 
 {#if statusMenuOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 z-40" onclick={closeStatusMenu}></div>
+  <div class="fixed inset-0 z-40" onclick={closeStatusMenu} onkeydown={e => e.key === "Escape" && closeStatusMenu(e as any)} role="presentation"></div>
 {/if}
 
 <div
@@ -78,6 +77,7 @@
     ? 'border-accent/50 bg-white/5'
     : ''} {isDone ? 'opacity-50' : ''}"
   {onclick}
+  onkeydown={e => (e.key === "Enter" || e.key === " ") && onclick()}
   role="button"
   tabindex="0"
 >

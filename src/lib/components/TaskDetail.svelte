@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment"
+  import { untrack } from "svelte"
   import type { Checklist, ChecklistItem, StatusConfig, Task } from "$lib/types"
   import { formatDate } from "$lib/utils"
   import { nanoid } from "nanoid"
@@ -25,7 +26,7 @@
   } = $props()
 
   let editingTitle = $state(false)
-  let titleValue = $state(task.title)
+  let titleValue = $state(untrack(() => task.title))
   let newSubtaskTitle = $state("")
   let newTagInput = $state("")
   let tagSuggestions = $state<string[]>([])
@@ -160,10 +161,11 @@
   aria-modal="true"
   tabindex="-1"
 >
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="bg-sidebar border border-border flex flex-col overflow-hidden w-full h-full sm:w-4/5 sm:h-4/5 sm:rounded-lg"
     onclick={e => e.stopPropagation()}
+    onkeydown={e => e.stopPropagation()}
+    role="presentation"
   >
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
@@ -174,6 +176,7 @@
   <div class="flex-1 overflow-y-auto p-4 space-y-4">
     <!-- Title -->
     {#if editingTitle}
+      <!-- svelte-ignore a11y_autofocus -->
       <input
         class="input text-base font-medium"
         bind:value={titleValue}
@@ -182,14 +185,12 @@
         autofocus
       />
     {:else}
-      <h2
-        class="text-base font-medium cursor-text hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
+      <button
+        class="text-base font-medium text-left w-full cursor-text hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
         onclick={() => (editingTitle = true)}
-        role="button"
-        tabindex="0"
       >
         {task.title}
-      </h2>
+      </button>
     {/if}
 
     <!-- Status & Priority row -->
@@ -224,7 +225,7 @@
 
     <!-- Tags -->
     <div>
-      <label class="text-xs text-gray-500 block mb-1.5">Tags</label>
+      <span class="text-xs text-gray-500 block mb-1.5">Tags</span>
       <div class="flex flex-wrap gap-1 mb-1.5">
         {#each task.tags as tag}
           <span class="inline-flex items-center gap-1 text-xs bg-white/10 rounded px-2 py-0.5">
@@ -257,7 +258,7 @@
 
     <!-- Description -->
     <div>
-      <label class="text-xs text-gray-500 block mb-1.5">Description</label>
+      <span class="text-xs text-gray-500 block mb-1.5">Description</span>
       {#if browser}
         {#await import("$lib/components/RichTextEditor.svelte") then { default: RichTextEditor }}
           <RichTextEditor
@@ -277,6 +278,7 @@
         <div>
           <div class="flex items-center justify-between mb-1.5">
             {#if editingChecklistId === checklist.id}
+              <!-- svelte-ignore a11y_autofocus -->
               <input
                 class="input text-xs flex-1 mr-2"
                 value={editingChecklistTitle}
@@ -289,14 +291,20 @@
                 autofocus
               />
             {:else}
-              <label
+              <span
                 class="text-xs text-gray-500 cursor-text hover:text-gray-300"
                 onclick={() => {
                   editingChecklistId = checklist.id
                   editingChecklistTitle = checklist.title
                 }}
+                onkeydown={e => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    editingChecklistId = checklist.id
+                    editingChecklistTitle = checklist.title
+                  }
+                }}
                 role="button"
-                tabindex="0">{checklist.title}</label
+                tabindex="0">{checklist.title}</span
               >
             {/if}
             <div class="flex items-center gap-2">
@@ -367,7 +375,7 @@
 
     <!-- Subtasks -->
     <div>
-      <label class="text-xs text-gray-500 block mb-1.5">Subtasks</label>
+      <span class="text-xs text-gray-500 block mb-1.5">Subtasks</span>
       <div class="space-y-0.5 mb-2">
         {#each subtasks as subtask (subtask._id)}
           <div class="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 text-sm">

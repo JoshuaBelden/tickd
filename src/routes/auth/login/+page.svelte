@@ -16,12 +16,12 @@
         <p class="text-red-400 text-sm">{form.error}</p>
       {/if}
       <div>
-        <label class="text-xs text-gray-400 block mb-1">Email</label>
-        <input class="input" type="email" name="email" required autocomplete="email" />
+        <label class="text-xs text-gray-400 block mb-1" for="login-email">Email</label>
+        <input id="login-email" class="input" type="email" name="email" required autocomplete="email" />
       </div>
       <div>
-        <label class="text-xs text-gray-400 block mb-1">Password</label>
-        <input class="input" type="password" name="password" required autocomplete="current-password" />
+        <label class="text-xs text-gray-400 block mb-1" for="login-password">Password</label>
+        <input id="login-password" class="input" type="password" name="password" required autocomplete="current-password" />
       </div>
       <button class="btn-primary w-full">Sign In</button>
     </form>
