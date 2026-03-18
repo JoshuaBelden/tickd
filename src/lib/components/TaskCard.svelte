@@ -48,13 +48,30 @@
 
   const priorityDotColor = $derived(priorityColor(task.priority))
 
-  function cycleStatus(e: MouseEvent) {
+  let statusMenuOpen = $state(false)
+
+  function openStatusMenu(e: MouseEvent) {
     e.stopPropagation()
-    const idx = statusConfig.findIndex(s => s.id === task.status)
-    const next = statusConfig[(idx + 1) % statusConfig.length]
-    onUpdate(task._id, { status: next.id })
+    statusMenuOpen = true
+  }
+
+  function selectStatus(e: MouseEvent, statusId: string) {
+    e.stopPropagation()
+    statusMenuOpen = false
+    if (statusId !== task.status) {
+      onUpdate(task._id, { status: statusId })
+    }
+  }
+
+  function closeStatusMenu(e: MouseEvent) {
+    statusMenuOpen = false
   }
 </script>
+
+{#if statusMenuOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 z-40" onclick={closeStatusMenu}></div>
+{/if}
 
 <div
   class="group flex items-center gap-3 px-3 py-2 rounded hover:bg-white/5 cursor-pointer border border-transparent {selected
@@ -65,14 +82,29 @@
   tabindex="0"
 >
   <!-- Status indicator -->
-  <button
-    class="w-4 h-4 rounded-full border-2 flex-shrink-0 transition-colors hover:opacity-80"
-    style="border-color: {statusInfo?.color ?? '#888'}; background: {isDone
-      ? (statusInfo?.color ?? '#888')
-      : 'transparent'}"
-    onclick={cycleStatus}
-    title="Cycle status"
-  ></button>
+  <div class="relative flex-shrink-0">
+    <button
+      class="w-4 h-4 rounded-full border-2 transition-colors hover:opacity-80"
+      style="border-color: {statusInfo?.color ?? '#888'}; background: {isDone
+        ? (statusInfo?.color ?? '#888')
+        : 'transparent'}"
+      onclick={openStatusMenu}
+      title="Change status"
+    ></button>
+    {#if statusMenuOpen}
+      <div class="absolute left-0 top-5 z-50 bg-gray-900 border border-white/10 rounded shadow-xl py-1 min-w-32">
+        {#each statusConfig as s (s.id)}
+          <button
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-white/10 transition-colors {s.id === task.status ? 'opacity-50' : ''}"
+            onclick={e => selectStatus(e, s.id)}
+          >
+            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: {s.color}"></span>
+            {s.name}
+          </button>
+        {/each}
+      </div>
+    {/if}
+  </div>
 
   <!-- Title -->
   <span class="flex-1 text-sm {isDone ? 'line-through text-gray-500' : 'text-gray-100'} truncate">
