@@ -35,6 +35,7 @@
   let editingChecklistId = $state<string | null>(null)
   let editingChecklistTitle = $state("")
   let confirmDeleteChecklistId = $state<string | null>(null)
+  let confirmDeleteTask = $state(false)
 
   $effect(() => {
     titleValue = task.title
@@ -401,7 +402,15 @@
   <!-- Footer -->
   <div class="px-4 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
     <span class="text-xs text-gray-600">Created {formatDate(task.createdAt)}</span>
-    <button class="text-xs text-red-500 hover:text-red-400" onclick={() => onDelete(task._id)}>Delete</button>
+    {#if confirmDeleteTask}
+      <span class="flex items-center gap-2">
+        <span class="text-xs text-gray-500">Delete this task?</span>
+        <button class="text-xs text-red-400 hover:text-red-300" onclick={() => onDelete(task._id)}>Yes, delete</button>
+        <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmDeleteTask = false}>Cancel</button>
+      </span>
+    {:else}
+      <button class="text-xs text-red-500 hover:text-red-400" onclick={() => confirmDeleteTask = true}>Delete</button>
+    {/if}
   </div>
   </div>
 </div>

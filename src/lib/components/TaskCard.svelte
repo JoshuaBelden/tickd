@@ -38,6 +38,8 @@
   const statusInfo = $derived(statusConfig.find(s => s.id === task.status))
   const isDone = $derived(statusInfo?.isDone ?? false)
 
+  let confirmDelete = $state(false)
+
   const dueDateClass = $derived(
     isOverdue(task.dueDate) && !isDone
       ? "text-red-400"
@@ -137,12 +139,21 @@
   {/each}
 
   <!-- Delete (hover) -->
-  <button
-    class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs transition-opacity flex-shrink-0"
-    onclick={e => {
-      e.stopPropagation()
-      onDelete(task._id)
-    }}
-    title="Delete">×</button
-  >
+  {#if confirmDelete}
+    <span class="flex items-center gap-1 flex-shrink-0">
+      <button
+        class="text-xs text-red-400 hover:text-red-300"
+        onclick={e => { e.stopPropagation(); onDelete(task._id) }}
+        title="Confirm delete">Yes</button>
+      <button
+        class="text-xs text-gray-500 hover:text-gray-300"
+        onclick={e => { e.stopPropagation(); confirmDelete = false }}
+        title="Cancel">No</button>
+    </span>
+  {:else}
+    <button
+      class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs transition-opacity flex-shrink-0"
+      onclick={e => { e.stopPropagation(); confirmDelete = true }}
+      title="Delete">×</button>
+  {/if}
 </div>
