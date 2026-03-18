@@ -23,6 +23,30 @@
   let draggedTaskId = $state<string | null>(null)
   let dragOverStatus = $state<string | null>(null)
 
+  const STORAGE_KEY = "boardCollapsedColumns"
+
+  function loadCollapsed(): Set<string> {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      return raw ? new Set(JSON.parse(raw)) : new Set()
+    } catch {
+      return new Set()
+    }
+  }
+
+  let collapsed = $state<Set<string>>(loadCollapsed())
+
+  function toggleCollapsed(statusId: string) {
+    const next = new Set(collapsed)
+    if (next.has(statusId)) next.delete(statusId)
+    else next.add(statusId)
+    collapsed = next
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]))
+    }
+  }
+
   const columns = $derived(
     statusConfig.map(s => ({
       ...s,
@@ -69,8 +93,11 @@
 
 <div class="flex gap-4 p-6 h-full overflow-x-auto items-start">
   {#each columns as col (col.id)}
+    {@const isCollapsed = collapsed.has(col.id)}
     <div
-      class="flex-shrink-0 w-72 flex flex-col rounded-lg border transition-colors {dragOverStatus === col.id
+      class="flex-shrink-0 flex flex-col rounded-lg border transition-all duration-200 {isCollapsed
+        ? 'w-10'
+        : 'w-72'} {dragOverStatus === col.id
         ? 'border-accent/60 bg-white/[0.07]'
         : 'border-border bg-surface'}"
       ondragover={e => onDragOver(e, col.id)}
@@ -80,13 +107,34 @@
       aria-label={col.name}
     >
       <!-- Column header -->
-      <div class="flex items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
-        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{col.color}"></span>
-        <span class="text-sm font-medium text-gray-200">{col.name}</span>
-        <span class="text-xs text-gray-500 ml-auto tabular-nums">{col.tasks.length}</span>
-      </div>
+      {#if isCollapsed}
+        <button
+          class="flex flex-col items-center justify-start gap-3 py-4 px-2 h-full w-full cursor-pointer hover:bg-white/5 rounded-lg transition-colors"
+          onclick={() => toggleCollapsed(col.id)}
+          title="Expand {col.name}"
+        >
+          <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{col.color}"></span>
+          <span
+            class="text-xs font-medium text-gray-400 writing-mode-vertical"
+            style="writing-mode:vertical-rl; transform:rotate(180deg); letter-spacing:0.05em;"
+          >{col.name}</span>
+          <span class="text-xs text-gray-600 tabular-nums mt-auto">{col.tasks.length}</span>
+        </button>
+      {:else}
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
+          <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{col.color}"></span>
+          <span class="text-sm font-medium text-gray-200">{col.name}</span>
+          <span class="text-xs text-gray-500 ml-auto tabular-nums">{col.tasks.length}</span>
+          <button
+            class="text-gray-600 hover:text-gray-300 transition-colors ml-1 text-xs leading-none"
+            onclick={() => toggleCollapsed(col.id)}
+            title="Collapse"
+          >‹</button>
+        </div>
+      {/if}
 
       <!-- Cards -->
+      {#if !isCollapsed}
       <div class="flex flex-col gap-2 p-3 min-h-16">
         {#each col.tasks as task (task._id)}
           {@const subtaskCount = allTasks.filter(t => t.parentId === task._id).length}
@@ -190,6 +238,7 @@
           </div>
         {/each}
       </div>
+      {/if}
     </div>
   {/each}
 </div>
