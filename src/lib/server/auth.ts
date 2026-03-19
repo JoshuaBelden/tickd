@@ -17,7 +17,8 @@ export async function getLucia(): Promise<Lucia> {
     sessionCookie: {
       attributes: {
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
       },
     },
     getUserAttributes: attributes => {

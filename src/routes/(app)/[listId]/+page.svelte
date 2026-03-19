@@ -304,7 +304,10 @@
             title="Toggle subtask visibility"
           >Subtasks</button>
         {/if}
-        <button class="btn-primary text-xs" onclick={() => (showNewTask = true)}> + New Task </button>
+        <button class="btn-primary text-xs" onclick={() => (showNewTask = true)}>
+          <span class="hidden sm:inline">+ New Task</span>
+          <span class="sm:hidden">+</span>
+        </button>
       </div>
     </header>
 

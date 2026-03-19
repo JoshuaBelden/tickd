@@ -193,10 +193,12 @@
               ? 'bg-white/10 text-white'
               : 'text-gray-400'} {$sidebarOpen ? 'pr-8' : 'justify-center px-0'}"
             title={$sidebarOpen ? undefined : list.name}
-            onclick={() => {
+            onclick={(e) => {
+              e.preventDefault()
               if (window.innerWidth < 1024) {
                 sidebarOpen.set(false)
               }
+              goto(`/${list._id}`)
             }}
           >
             <HeroIcon name={list.icon} class="w-4 h-4 flex-shrink-0" style="color:{list.color}" />
