@@ -6,7 +6,7 @@
   import HeroIcon from "$lib/components/HeroIcon.svelte"
   import TaskCard from "$lib/components/TaskCard.svelte"
   import TaskDetail from "$lib/components/TaskDetail.svelte"
-  import { selectedTaskId, showSearch, viewMode } from "$lib/stores/ui"
+  import { selectedTaskId, showSearch, showSubtasksInList, viewMode } from "$lib/stores/ui"
   import type { GroupBy, SortField, StatusConfig, Tag, Task } from "$lib/types"
   import { priorityOrder } from "$lib/utils"
   import { getContext, untrack } from "svelte"
@@ -296,6 +296,13 @@
           <option value="createdAt">Sort: Created</option>
         </select>
 
+        {#if $viewMode === "list"}
+          <button
+            class="hidden sm:block text-xs px-2 py-1 rounded border border-border transition-colors {$showSubtasksInList ? 'bg-white/10 text-white border-white/20' : 'text-gray-400 hover:text-gray-200'}"
+            onclick={() => ($showSubtasksInList = !$showSubtasksInList)}
+            title="Toggle subtask visibility"
+          >Subtasks</button>
+        {/if}
         <button class="btn-primary text-xs" onclick={() => (showNewTask = true)}> + New Task </button>
       </div>
     </header>
@@ -347,6 +354,20 @@
                   onUpdate={updateTask}
                   onDelete={deleteTask}
                 />
+                {#if $showSubtasksInList}
+                  {#each tasks.filter(t => t.parentId === task._id) as subtask (subtask._id)}
+                    <TaskCard
+                      task={subtask}
+                      {tasks}
+                      {statusConfig}
+                      selected={$selectedTaskId === subtask._id}
+                      onclick={() => ($selectedTaskId = subtask._id)}
+                      onUpdate={updateTask}
+                      onDelete={deleteTask}
+                      indent={true}
+                    />
+                  {/each}
+                {/if}
               {/each}
 
               <!-- Inline add task -->

@@ -19,6 +19,7 @@
     onclick,
     onUpdate,
     onDelete,
+    indent = false,
   }: {
     task: Task
     tasks: Task[]
@@ -27,6 +28,7 @@
     onclick: () => void
     onUpdate: (id: string, updates: Partial<Task>) => Promise<void>
     onDelete: (id: string) => Promise<void>
+    indent?: boolean
   } = $props()
 
   const subtaskCount = $derived(tasks.filter(t => t.parentId === task._id).length)
@@ -86,7 +88,7 @@
 <div
   class="group flex items-center px-4 py-1 border-b border-border/40 hover:bg-white/5 cursor-pointer {selected
     ? 'bg-white/5'
-    : ''} {isDone ? 'opacity-50' : ''}"
+    : ''} {isDone ? 'opacity-50' : ''} {indent ? 'pl-10 bg-black/10' : ''}"
   {onclick}
   onkeydown={e => (e.key === "Enter" || e.key === " ") && onclick()}
   role="button"
@@ -94,6 +96,9 @@
 >
   <!-- Title column (flex-1): status dot + title + inline meta -->
   <div class="flex-1 flex items-center gap-2 min-w-0">
+    {#if indent}
+      <span class="text-gray-700 flex-shrink-0 text-xs">↳</span>
+    {/if}
     <!-- Status indicator -->
     <div class="relative flex-shrink-0">
       <button

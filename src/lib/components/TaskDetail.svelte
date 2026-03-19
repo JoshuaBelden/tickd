@@ -34,6 +34,17 @@
 
   const tagsCtx = getContext<{ get: () => Tag[]; set: (t: Tag[]) => void }>("tags")
 
+  // Navigation stack: push subtask IDs to drill into them in-place
+  let navStack = $state<string[]>([])
+
+  const activeTask = $derived(
+    navStack.length > 0
+      ? (tasks.find(t => t._id === navStack[navStack.length - 1]) ?? task)
+      : task
+  )
+  const activeSubtasks = $derived(tasks.filter(t => t.parentId === activeTask._id))
+  let confirmDeleteSubtaskId = $state<string | null>(null)
+
   let editingTitle = $state(false)
   let titleValue = $state(untrack(() => task.title))
   let newSubtaskTitle = $state("")
@@ -55,15 +66,27 @@
   let confirmArchiveTask = $state(false)
   let showMoveList = $state(false)
 
+  // Reset stack when root task prop changes
   $effect(() => {
-    titleValue = task.title
+    task
+    navStack = []
+  })
+
+  // Prune stack if tasks are deleted externally
+  $effect(() => {
+    const valid = navStack.filter(id => tasks.some(t => t._id === id))
+    if (valid.length !== navStack.length) navStack = valid
+  })
+
+  $effect(() => {
+    titleValue = activeTask.title
   })
 
   const effectiveChecklists = $derived(
-    task.checklists && task.checklists.length > 0
-      ? task.checklists
-      : task.checklist && task.checklist.length > 0
-        ? [{ id: "legacy", title: "Checklist", items: task.checklist }]
+    activeTask.checklists && activeTask.checklists.length > 0
+      ? activeTask.checklists
+      : activeTask.checklist && activeTask.checklist.length > 0
+        ? [{ id: "legacy", title: "Checklist", items: activeTask.checklist }]
         : [],
   )
 
@@ -77,12 +100,11 @@
     showCompletedMap = map
   })
 
-  const subtasks = $derived(tasks.filter(t => t.parentId === task._id))
-  const statusInfo = $derived(statusConfig.find(s => s.id === task.status))
+  const statusInfo = $derived(statusConfig.find(s => s.id === activeTask.status))
 
   async function saveTitle() {
-    if (titleValue.trim() && titleValue !== task.title) {
-      await onUpdate(task._id, { title: titleValue.trim() })
+    if (titleValue.trim() && titleValue !== activeTask.title) {
+      await onUpdate(activeTask._id, { title: titleValue.trim() })
     }
     editingTitle = false
   }
@@ -91,21 +113,21 @@
     const title = editingChecklistTitle.trim()
     if (title) {
       const updated = effectiveChecklists.map(cl => (cl.id === checklistId ? { ...cl, title } : cl))
-      await onUpdate(task._id, { checklists: updated, checklist: [] })
+      await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
     }
     editingChecklistId = null
   }
 
   async function deleteChecklist(checklistId: string) {
     const updated = effectiveChecklists.filter(cl => cl.id !== checklistId)
-    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
     confirmDeleteChecklistId = null
   }
 
   async function addChecklist() {
     const title = `Checklist ${effectiveChecklists.length + 1}`
     const newCl: Checklist = { id: nanoid(), title, items: [] }
-    await onUpdate(task._id, { checklists: [...effectiveChecklists, newCl], checklist: [] })
+    await onUpdate(activeTask._id, { checklists: [...effectiveChecklists, newCl], checklist: [] })
   }
 
   async function addChecklistItem(checklistId: string) {
@@ -115,7 +137,7 @@
     const updated = effectiveChecklists.map(cl =>
       cl.id === checklistId ? { ...cl, items: [...cl.items, newItem] } : cl,
     )
-    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
     newItemMap = { ...newItemMap, [checklistId]: "" }
   }
 
@@ -125,14 +147,14 @@
         ? { ...cl, items: cl.items.map(item => (item.id === itemId ? { ...item, checked: !item.checked } : item)) }
         : cl,
     )
-    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
   }
 
   async function removeChecklistItem(checklistId: string, itemId: string) {
     const updated = effectiveChecklists.map(cl =>
       cl.id === checklistId ? { ...cl, items: cl.items.filter(item => item.id !== itemId) } : cl,
     )
-    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
   }
 
   function itemDragStart(e: DragEvent, checklistId: string, itemIndex: number) {
@@ -166,7 +188,7 @@
     const [moved] = newItems.splice(dragIdx, 1)
     newItems.splice(insertIdx > dragIdx ? insertIdx - 1 : insertIdx, 0, moved)
     const updated = effectiveChecklists.map(c => (c.id === checklistId ? { ...c, items: newItems } : c))
-    await onUpdate(task._id, { checklists: updated, checklist: [] })
+    await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
     clDragIndex = { ...clDragIndex, [checklistId]: null }
     clInsertIndex = { ...clInsertIndex, [checklistId]: null }
   }
@@ -183,8 +205,8 @@
   }
 
   async function addTagById(tagId: string) {
-    if (task.tags.includes(tagId)) return
-    await onUpdate(task._id, { tags: [...task.tags, tagId] })
+    if (activeTask.tags.includes(tagId)) return
+    await onUpdate(activeTask._id, { tags: [...activeTask.tags, tagId] })
     newTagInput = ""
     tagSuggestions = []
   }
@@ -210,7 +232,7 @@
   }
 
   async function removeTagFromTask(tagId: string) {
-    await onUpdate(task._id, { tags: task.tags.filter(t => t !== tagId) })
+    await onUpdate(activeTask._id, { tags: activeTask.tags.filter(t => t !== tagId) })
     tagMenuOpen = null
   }
 
@@ -247,7 +269,7 @@
   async function deleteTagGlobally(tagId: string) {
     await fetch(`/api/tags/${tagId}`, { method: "DELETE" })
     tagsCtx.set(tagsCtx.get().filter(t => t._id !== tagId))
-    await onUpdate(task._id, { tags: task.tags.filter(t => t !== tagId) })
+    await onUpdate(activeTask._id, { tags: activeTask.tags.filter(t => t !== tagId) })
     confirmDeleteTagId = null
     tagMenuOpen = null
   }
@@ -255,7 +277,7 @@
   function onTagInput() {
     if (newTagInput.trim().length > 0) {
       tagSuggestions = allTags
-        .filter(t => t.name.toLowerCase().includes(newTagInput.toLowerCase()) && !task.tags.includes(t._id))
+        .filter(t => t.name.toLowerCase().includes(newTagInput.toLowerCase()) && !activeTask.tags.includes(t._id))
         .slice(0, 5)
     } else {
       tagSuggestions = []
@@ -275,8 +297,27 @@
 
   async function addSubtask() {
     if (!newSubtaskTitle.trim()) return
-    await onCreateSubtask(task._id, newSubtaskTitle.trim())
+    await onCreateSubtask(activeTask._id, newSubtaskTitle.trim())
     newSubtaskTitle = ""
+  }
+
+  function navigateToSubtask(id: string) {
+    navStack = [...navStack, id]
+    editingTitle = false
+    confirmDeleteTask = false
+    confirmArchiveTask = false
+    confirmDeleteSubtaskId = null
+  }
+
+  function navigateBack() {
+    navStack = navStack.slice(0, -1)
+  }
+
+  async function handleDeleteActive() {
+    const idToDelete = activeTask._id
+    if (navStack.length > 0) navigateBack()
+    await onDelete(idToDelete)
+    confirmDeleteTask = false
   }
 
   const priorities = ["none", "low", "medium", "high", "urgent"] as const
@@ -299,7 +340,32 @@
   >
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-    <span class="text-xs text-gray-500">Task</span>
+    <div class="flex items-center gap-1 text-xs text-gray-500 min-w-0">
+      {#if navStack.length > 0}
+        <button class="hover:text-gray-200 flex-shrink-0 mr-1" onclick={navigateBack}>‹</button>
+        <button class="hover:text-gray-300 truncate max-w-[120px]" onclick={() => (navStack = [])}>{task.title}</button>
+        {#each navStack.slice(0, -1) as stackId}
+          {@const st = tasks.find(t => t._id === stackId)}
+          {#if st}
+            <span class="flex-shrink-0 mx-0.5">›</span>
+            <button class="hover:text-gray-300 truncate max-w-[80px]" onclick={() => (navStack = navStack.slice(0, navStack.indexOf(stackId) + 1))}>{st.title}</button>
+          {/if}
+        {/each}
+        <span class="flex-shrink-0 mx-0.5">›</span>
+        <span class="text-gray-300 truncate max-w-[120px]">{activeTask.title}</span>
+      {:else if task.parentId}
+        {@const parentTask = tasks.find(t => t._id === task.parentId)}
+        {#if parentTask}
+          <span class="truncate max-w-[120px]">{parentTask.title}</span>
+          <span class="mx-0.5">›</span>
+          <span class="text-gray-300 truncate max-w-[120px]">{task.title}</span>
+        {:else}
+          <span>Task</span>
+        {/if}
+      {:else}
+        <span>Task</span>
+      {/if}
+    </div>
     <button class="text-gray-500 hover:text-gray-100 text-lg leading-none" onclick={onClose}>×</button>
   </div>
 
@@ -319,7 +385,7 @@
         class="text-base font-medium text-left w-full cursor-text hover:bg-white/5 rounded px-1 py-0.5 -mx-1"
         onclick={() => (editingTitle = true)}
       >
-        {task.title}
+        {activeTask.title}
       </button>
     {/if}
 
@@ -327,8 +393,8 @@
     <div class="flex items-center gap-2 flex-wrap">
       <select
         class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300"
-        value={task.status}
-        onchange={e => onUpdate(task._id, { status: (e.target as HTMLSelectElement).value })}
+        value={activeTask.status}
+        onchange={e => onUpdate(activeTask._id, { status: (e.target as HTMLSelectElement).value })}
       >
         {#each statusConfig as s (s.id)}
           <option value={s.id} style="color:{s.color}">{s.name}</option>
@@ -337,8 +403,8 @@
 
       <select
         class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300"
-        value={task.priority}
-        onchange={e => onUpdate(task._id, { priority: (e.target as HTMLSelectElement).value as any })}
+        value={activeTask.priority}
+        onchange={e => onUpdate(activeTask._id, { priority: (e.target as HTMLSelectElement).value as any })}
       >
         {#each priorities as p}
           <option value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
@@ -348,8 +414,8 @@
       <input
         type="date"
         class="text-xs bg-surface border border-border rounded px-2 py-1 text-gray-300"
-        value={task.dueDate ? task.dueDate.split("T")[0] : ""}
-        onchange={e => onUpdate(task._id, { dueDate: (e.target as HTMLInputElement).value || null })}
+        value={activeTask.dueDate ? activeTask.dueDate.split("T")[0] : ""}
+        onchange={e => onUpdate(activeTask._id, { dueDate: (e.target as HTMLInputElement).value || null })}
       />
     </div>
 
@@ -357,7 +423,7 @@
     <div>
       <span class="text-xs text-gray-500 block mb-1.5">Tags</span>
       <div class="flex flex-wrap gap-1 mb-1.5">
-        {#each task.tags as tagId}
+        {#each activeTask.tags as tagId}
           {@const tagObj = allTags.find(t => t._id === tagId)}
           {#if tagObj}
             <span
@@ -477,8 +543,8 @@
       {#if browser}
         {#await import("$lib/components/RichTextEditor.svelte") then { default: RichTextEditor }}
           <RichTextEditor
-            content={task.description}
-            onChange={content => onUpdate(task._id, { description: content })}
+            content={activeTask.description}
+            onChange={content => onUpdate(activeTask._id, { description: content })}
           />
         {/await}
       {/if}
@@ -614,12 +680,29 @@
     <div>
       <span class="text-xs text-gray-500 block mb-1.5">Subtasks</span>
       <div class="space-y-0.5 mb-2">
-        {#each subtasks as subtask (subtask._id)}
-          <div class="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 text-sm">
-            <span class="w-3 h-3 rounded-full border border-gray-600 flex-shrink-0"></span>
-            <span class={statusConfig.find(s => s.id === subtask.status)?.isDone ? "line-through text-gray-500" : ""}
-              >{subtask.title}</span
-            >
+        {#each activeSubtasks as subtask (subtask._id)}
+          <div class="group flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 text-sm">
+            <span
+              class="w-3 h-3 rounded-full flex-shrink-0"
+              style="background:{statusConfig.find(s => s.id === subtask.status)?.color ?? '#888'}"
+            ></span>
+            <button
+              class="flex-1 text-left truncate hover:text-gray-100 {statusConfig.find(s => s.id === subtask.status)?.isDone ? 'line-through text-gray-500' : ''}"
+              onclick={() => navigateToSubtask(subtask._id)}
+            >{subtask.title}</button>
+            {#if confirmDeleteSubtaskId === subtask._id}
+              <span class="flex items-center gap-1 flex-shrink-0">
+                <span class="text-xs text-gray-500">Delete?</span>
+                <button class="text-xs text-red-400 hover:text-red-300" onclick={() => { onDelete(subtask._id); confirmDeleteSubtaskId = null }}>Yes</button>
+                <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmDeleteSubtaskId = null}>No</button>
+              </span>
+            {:else}
+              <button
+                class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs transition-opacity flex-shrink-0"
+                onclick={() => confirmDeleteSubtaskId = subtask._id}
+                title="Delete subtask"
+              >×</button>
+            {/if}
           </div>
         {/each}
       </div>
@@ -637,7 +720,7 @@
 
   <!-- Footer -->
   <div class="px-4 py-3 border-t border-border flex-shrink-0 flex items-center justify-between gap-4">
-    <span class="text-xs text-gray-600">Created {formatDate(task.createdAt)}</span>
+    <span class="text-xs text-gray-600">Created {formatDate(activeTask.createdAt)}</span>
     <div class="flex items-center gap-3">
       {#if showMoveList}
         <span class="flex items-center gap-1.5">
@@ -648,7 +731,7 @@
               const newListId = (e.target as HTMLSelectElement).value
               if (newListId !== currentListId) {
                 showMoveList = false
-                await onUpdate(task._id, { listId: newListId })
+                await onUpdate(activeTask._id, { listId: newListId })
               } else {
                 showMoveList = false
               }
@@ -663,15 +746,15 @@
       {:else}
         <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => (showMoveList = true)}>Move to list</button>
       {/if}
-      {#if task.archivedAt !== null}
+      {#if activeTask.archivedAt !== null}
         <button
           class="text-xs text-gray-400 hover:text-gray-100"
-          onclick={() => onUpdate(task._id, { archivedAt: null, listId: currentListId, status: currentListStatusConfig[0]?.id ?? task.status })}
+          onclick={() => onUpdate(activeTask._id, { archivedAt: null, listId: currentListId, status: currentListStatusConfig[0]?.id ?? activeTask.status })}
         >Unarchive to this list</button>
       {:else if confirmArchiveTask}
         <span class="flex items-center gap-2">
           <span class="text-xs text-gray-500">Archive this task?</span>
-          <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={() => { confirmArchiveTask = false; onUpdate(task._id, { archivedAt: new Date().toISOString() }) }}>Yes</button>
+          <button class="text-xs text-yellow-400 hover:text-yellow-300" onclick={() => { confirmArchiveTask = false; onUpdate(activeTask._id, { archivedAt: new Date().toISOString() }) }}>Yes</button>
           <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmArchiveTask = false}>No</button>
         </span>
       {:else}
@@ -680,7 +763,7 @@
       {#if confirmDeleteTask}
         <span class="flex items-center gap-2">
           <span class="text-xs text-gray-500">Delete this task?</span>
-          <button class="text-xs text-red-400 hover:text-red-300" onclick={() => onDelete(task._id)}>Yes, delete</button>
+          <button class="text-xs text-red-400 hover:text-red-300" onclick={() => handleDeleteActive()}>Yes, delete</button>
           <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmDeleteTask = false}>Cancel</button>
         </span>
       {:else}

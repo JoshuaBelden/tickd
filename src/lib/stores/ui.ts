@@ -15,5 +15,6 @@ function persistedWritable<T>(key: string, initial: T) {
 }
 
 export const sidebarOpen = persistedWritable("sidebarOpen", true)
+export const showSubtasksInList = persistedWritable("showSubtasksInList", false)
 
 export const showSearch = writable(false)
