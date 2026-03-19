@@ -46,6 +46,7 @@
   function onKeyDown(e: KeyboardEvent) {
     const target = e.target as HTMLElement
     if (e.key === "n" && target.tagName === "BODY") {
+      e.preventDefault()
       showNewTask = true
     }
     if (e.key === "Escape") {
