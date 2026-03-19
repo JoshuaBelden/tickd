@@ -109,13 +109,16 @@
       ]
 
     if (groupBy === "status") {
-      return statusConfig.map(s => ({
-        key: s.id,
-        label: s.name,
-        color: s.color,
-        isDone: s.isDone,
-        tasks: filteredTasks.filter(t => t.status === s.id && !t.parentId),
-      }))
+      return [...statusConfig]
+        .filter(s => !s.isDone)
+        .reverse()
+        .map(s => ({
+          key: s.id,
+          label: s.name,
+          color: s.color,
+          isDone: s.isDone,
+          tasks: filteredTasks.filter(t => t.status === s.id && !t.parentId),
+        }))
     }
 
     const priorities = ["urgent", "high", "medium", "low", "none"] as const

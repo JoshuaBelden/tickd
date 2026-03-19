@@ -7,6 +7,7 @@
 <div class="min-h-screen flex items-center justify-center">
   <div class="w-80 space-y-6">
     <div class="text-center">
+      <img src="/images/logo.png" alt="tickd" class="w-20 h-20 mx-auto mb-3" />
       <h1 class="text-3xl font-bold tracking-tight">tickd</h1>
       <p class="text-gray-400 mt-1 text-sm">Sign in to your account</p>
     </div>
