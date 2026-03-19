@@ -145,7 +145,7 @@
   </div>
 
   <!-- Priority column -->
-  <div class="w-28 flex-shrink-0 flex items-center gap-1.5">
+  <div class="hidden sm:flex w-28 flex-shrink-0 items-center gap-1.5">
     {#if task.priority !== "none"}
       <svg class="w-3 h-3 flex-shrink-0" viewBox="0 0 10 12" fill="currentColor" style="color:{priorityDotColor}">
         <rect x="0.75" y="0" width="1.5" height="12" rx="0.75"/>
@@ -156,7 +156,7 @@
   </div>
 
   <!-- Due date column -->
-  <div class="w-28 flex-shrink-0">
+  <div class="hidden sm:block w-28 flex-shrink-0">
     {#if task.dueDate}
       <span class="text-xs {dueDateClass}">{formatDate(task.dueDate)}</span>
     {/if}

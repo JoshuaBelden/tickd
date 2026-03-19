@@ -321,8 +321,8 @@
               <div class="w-2.5 flex-shrink-0"></div><!-- spacer for status dot -->
               <span>Task</span>
             </div>
-            <div class="w-28 flex-shrink-0">Priority</div>
-            <div class="w-28 flex-shrink-0">Due Date</div>
+            <div class="hidden sm:block w-28 flex-shrink-0">Priority</div>
+            <div class="hidden sm:block w-28 flex-shrink-0">Due Date</div>
             <div class="w-6 flex-shrink-0"></div>
           </div>
 
