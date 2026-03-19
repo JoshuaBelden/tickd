@@ -1,7 +1,8 @@
 <script lang="ts">
   import { browser } from "$app/environment"
-  import { untrack } from "svelte"
-  import type { Checklist, ChecklistItem, List, StatusConfig, Task } from "$lib/types"
+  import { getContext, untrack } from "svelte"
+  import type { Checklist, ChecklistItem, List, StatusConfig, Tag, Task } from "$lib/types"
+  import { TAG_COLORS } from "$lib/types"
   import { formatDate } from "$lib/utils"
   import { nanoid } from "nanoid"
 
@@ -21,7 +22,7 @@
     task: Task
     tasks: Task[]
     statusConfig: StatusConfig[]
-    allTags: string[]
+    allTags: Tag[]
     currentListId: string
     currentListStatusConfig: StatusConfig[]
     lists: List[]
@@ -31,11 +32,18 @@
     onClose: () => void
   } = $props()
 
+  const tagsCtx = getContext<{ get: () => Tag[]; set: (t: Tag[]) => void }>("tags")
+
   let editingTitle = $state(false)
   let titleValue = $state(untrack(() => task.title))
   let newSubtaskTitle = $state("")
   let newTagInput = $state("")
-  let tagSuggestions = $state<string[]>([])
+  let tagSuggestions = $state<Tag[]>([])
+  let tagMenuOpen = $state<string | null>(null)
+  let tagRenaming = $state<string | null>(null)
+  let tagRenameValue = $state("")
+  let tagColorPickerFor = $state<string | null>(null)
+  let confirmDeleteTagId = $state<string | null>(null)
   let showCompletedMap = $state<Record<string, boolean>>({})
   let newItemMap = $state<Record<string, string>>({})
   let editingChecklistId = $state<string | null>(null)
@@ -174,24 +182,94 @@
     if (browser) localStorage.setItem(`show-done-${checklistId}`, String(next))
   }
 
-  async function addTag(tag: string) {
-    if (!tag.trim() || task.tags.includes(tag)) return
-    await onUpdate(task._id, { tags: [...task.tags, tag.trim()] })
+  async function addTagById(tagId: string) {
+    if (task.tags.includes(tagId)) return
+    await onUpdate(task._id, { tags: [...task.tags, tagId] })
     newTagInput = ""
     tagSuggestions = []
   }
 
-  async function removeTag(tag: string) {
-    await onUpdate(task._id, { tags: task.tags.filter(t => t !== tag) })
+  async function createAndAddTag(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const res = await fetch("/api/tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed, color: TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)] }),
+    })
+    if (res.status === 409) {
+      // Tag already exists — get it from allTags
+      const existing = allTags.find(t => t.name.toLowerCase() === trimmed.toLowerCase())
+      if (existing) await addTagById(existing._id)
+      return
+    }
+    if (!res.ok) return
+    const newTag: Tag = await res.json()
+    tagsCtx.set([...tagsCtx.get(), newTag].sort((a, b) => a.name.localeCompare(b.name)))
+    await addTagById(newTag._id)
+  }
+
+  async function removeTagFromTask(tagId: string) {
+    await onUpdate(task._id, { tags: task.tags.filter(t => t !== tagId) })
+    tagMenuOpen = null
+  }
+
+  async function renameTag(tagId: string) {
+    const name = tagRenameValue.trim()
+    if (!name) { tagRenaming = null; return }
+    const res = await fetch(`/api/tags/${tagId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      const updated: Tag = await res.json()
+      tagsCtx.set(tagsCtx.get().map(t => t._id === tagId ? updated : t))
+    }
+    tagRenaming = null
+    tagMenuOpen = null
+  }
+
+  async function setTagColor(tagId: string, color: string) {
+    const res = await fetch(`/api/tags/${tagId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color }),
+    })
+    if (res.ok) {
+      const updated: Tag = await res.json()
+      tagsCtx.set(tagsCtx.get().map(t => t._id === tagId ? updated : t))
+    }
+    tagColorPickerFor = null
+    tagMenuOpen = null
+  }
+
+  async function deleteTagGlobally(tagId: string) {
+    await fetch(`/api/tags/${tagId}`, { method: "DELETE" })
+    tagsCtx.set(tagsCtx.get().filter(t => t._id !== tagId))
+    await onUpdate(task._id, { tags: task.tags.filter(t => t !== tagId) })
+    confirmDeleteTagId = null
+    tagMenuOpen = null
   }
 
   function onTagInput() {
     if (newTagInput.trim().length > 0) {
       tagSuggestions = allTags
-        .filter(t => t.toLowerCase().includes(newTagInput.toLowerCase()) && !task.tags.includes(t))
+        .filter(t => t.name.toLowerCase().includes(newTagInput.toLowerCase()) && !task.tags.includes(t._id))
         .slice(0, 5)
     } else {
       tagSuggestions = []
+    }
+  }
+
+  async function onTagEnter() {
+    const trimmed = newTagInput.trim()
+    if (!trimmed) return
+    const exact = allTags.find(t => t.name.toLowerCase() === trimmed.toLowerCase())
+    if (exact) {
+      await addTagById(exact._id)
+    } else {
+      await createAndAddTag(trimmed)
     }
   }
 
@@ -279,11 +357,86 @@
     <div>
       <span class="text-xs text-gray-500 block mb-1.5">Tags</span>
       <div class="flex flex-wrap gap-1 mb-1.5">
-        {#each task.tags as tag}
-          <span class="inline-flex items-center gap-1 text-xs bg-white/10 rounded px-2 py-0.5">
-            {tag}
-            <button class="text-gray-500 hover:text-gray-100" onclick={() => removeTag(tag)}>×</button>
-          </span>
+        {#each task.tags as tagId}
+          {@const tagObj = allTags.find(t => t._id === tagId)}
+          {#if tagObj}
+            <span
+              class="relative inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 group/tag"
+              style="background-color: {tagObj.color}25; color: {tagObj.color}; border: 1px solid {tagObj.color}50"
+            >
+              {#if tagRenaming === tagId}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class="bg-transparent outline-none w-20 text-xs"
+                  bind:value={tagRenameValue}
+                  onblur={() => renameTag(tagId)}
+                  onkeydown={e => { if (e.key === "Enter") renameTag(tagId); if (e.key === "Escape") { tagRenaming = null; tagMenuOpen = null } }}
+                  autofocus
+                />
+              {:else}
+                {tagObj.name}
+              {/if}
+              <button
+                class="opacity-0 group-hover/tag:opacity-100 transition-opacity text-xs leading-none"
+                onclick={e => { e.stopPropagation(); tagMenuOpen = tagMenuOpen === tagId ? null : tagId; confirmDeleteTagId = null; tagColorPickerFor = null }}
+                title="Tag options"
+              >···</button>
+              <button
+                class="opacity-0 group-hover/tag:opacity-100 transition-opacity text-xs leading-none"
+                onclick={() => removeTagFromTask(tagId)}
+                title="Remove from task"
+              >×</button>
+              {#if tagMenuOpen === tagId}
+                <div
+                  class="absolute left-0 top-full mt-0.5 z-50 bg-gray-900 border border-white/10 rounded shadow-xl py-1 min-w-36"
+                  onclick={e => e.stopPropagation()}
+                  role="menu"
+                >
+                  {#if tagColorPickerFor === tagId}
+                    <div class="px-3 py-2">
+                      <div class="flex flex-wrap gap-1.5">
+                        {#each TAG_COLORS as c}
+                          <button
+                            class="w-5 h-5 rounded-full border-2 transition-all {tagObj.color === c ? 'border-white scale-110' : 'border-transparent'}"
+                            style="background:{c}"
+                            onclick={() => setTagColor(tagId, c)}
+                          ></button>
+                        {/each}
+                      </div>
+                      <button class="text-xs text-gray-500 hover:text-gray-300 mt-2" onclick={() => tagColorPickerFor = null}>Back</button>
+                    </div>
+                  {:else}
+                    <button
+                      class="w-full text-left px-3 py-1.5 text-xs text-gray-200 hover:bg-white/10"
+                      onclick={() => { tagRenaming = tagId; tagRenameValue = tagObj.name; tagMenuOpen = null }}
+                    >Rename</button>
+                    <button
+                      class="w-full text-left px-3 py-1.5 text-xs text-gray-200 hover:bg-white/10"
+                      onclick={() => tagColorPickerFor = tagId}
+                    >Change color</button>
+                    <button
+                      class="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10"
+                      onclick={() => removeTagFromTask(tagId)}
+                    >Remove from task</button>
+                    <div class="border-t border-white/10 my-1"></div>
+                    {#if confirmDeleteTagId === tagId}
+                      <div class="flex items-center gap-2 px-3 py-1.5">
+                        <span class="text-xs text-gray-400">Delete everywhere?</span>
+                        <button class="text-xs text-red-400 hover:text-red-300" onclick={() => deleteTagGlobally(tagId)}>Yes</button>
+                        <button class="text-xs text-gray-500" onclick={() => confirmDeleteTagId = null}>No</button>
+                      </div>
+                    {:else}
+                      <button
+                        class="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-white/10"
+                        onclick={() => confirmDeleteTagId = tagId}
+                      >Delete tag...</button>
+                    {/if}
+                  {/if}
+                </div>
+                <div class="fixed inset-0 z-40" onclick={() => { tagMenuOpen = null; tagColorPickerFor = null; confirmDeleteTagId = null }} role="presentation"></div>
+              {/if}
+            </span>
+          {/if}
         {/each}
       </div>
       <div class="relative">
@@ -292,17 +445,27 @@
           placeholder="Add tag..."
           bind:value={newTagInput}
           oninput={onTagInput}
-          onkeydown={e => {
-            if (e.key === "Enter") addTag(newTagInput)
-          }}
+          onkeydown={e => { if (e.key === "Enter") onTagEnter() }}
         />
-        {#if tagSuggestions.length > 0}
+        {#if tagSuggestions.length > 0 || (newTagInput.trim() && !allTags.find(t => t.name.toLowerCase() === newTagInput.trim().toLowerCase()))}
           <div class="absolute z-10 top-full left-0 right-0 bg-surface border border-border rounded mt-0.5">
-            {#each tagSuggestions as s}
-              <button class="block w-full text-left text-xs px-3 py-1.5 hover:bg-white/5" onclick={() => addTag(s)}
-                >{s}</button
+            {#each tagSuggestions as t}
+              <button
+                class="flex items-center gap-2 w-full text-left text-xs px-3 py-1.5 hover:bg-white/5"
+                onclick={() => addTagById(t._id)}
               >
+                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:{t.color}"></span>
+                {t.name}
+              </button>
             {/each}
+            {#if newTagInput.trim() && !allTags.find(t => t.name.toLowerCase() === newTagInput.trim().toLowerCase())}
+              <button
+                class="flex items-center gap-2 w-full text-left text-xs px-3 py-1.5 hover:bg-white/5 text-gray-400"
+                onclick={() => createAndAddTag(newTagInput)}
+              >
+                <span class="text-gray-500">+</span> Create "{newTagInput.trim()}"
+              </button>
+            {/if}
           </div>
         {/if}
       </div>

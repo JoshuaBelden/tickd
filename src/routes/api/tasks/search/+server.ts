@@ -1,4 +1,4 @@
-import { getListsCollection, getTasksCollection } from "$lib/server/collections"
+import { getListsCollection, getTagsCollection, getTasksCollection } from "$lib/server/collections"
 import { serializeDoc } from "$lib/utils"
 import { error, json } from "@sveltejs/kit"
 import type { RequestHandler } from "./$types"
@@ -14,10 +14,20 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
   const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
 
+  // Find tag IDs whose names match the query
+  const tagsCol = await getTagsCollection()
+  const matchingTags = await tagsCol
+    .find({ userId: locals.user.id, name: { $regex: regex } })
+    .toArray()
+  const matchingTagIds = matchingTags.map(t => t._id.toString())
+
   const filter: Record<string, any> = {
     userId: locals.user.id,
     archivedAt: archived ? { $ne: null } : null,
-    $or: [{ title: { $regex: regex } }, { tags: { $regex: regex } }],
+    $or: [
+      { title: { $regex: regex } },
+      ...(matchingTagIds.length > 0 ? [{ tags: { $in: matchingTagIds } }] : []),
+    ],
   }
   if (listId) filter.listId = listId
 

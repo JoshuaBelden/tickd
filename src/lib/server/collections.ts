@@ -1,4 +1,4 @@
-import type { List, Task, UserSettings } from "$lib/types"
+import type { List, Tag, Task, UserSettings } from "$lib/types"
 import type { Collection, Document } from "mongodb"
 import { getDb } from "./db"
 
@@ -25,4 +25,9 @@ export async function getTasksCollection(): Promise<Collection<Task & Document>>
 export async function getUserSettingsCollection(): Promise<Collection<UserSettings & Document>> {
   const db = await getDb()
   return db.collection("userSettings") as Collection<UserSettings & Document>
+}
+
+export async function getTagsCollection(): Promise<Collection<Tag & Document>> {
+  const db = await getDb()
+  return db.collection("tags") as Collection<Tag & Document>
 }

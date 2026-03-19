@@ -1,15 +1,82 @@
 <script lang="ts">
-  import type { StatusConfig } from "$lib/types"
+  import type { StatusConfig, Tag } from "$lib/types"
+  import { TAG_COLORS } from "$lib/types"
 
   let {
     statusConfig,
+    tags,
     onClose,
     onStatusConfigUpdated,
+    onTagsUpdated,
   }: {
     statusConfig: StatusConfig[]
+    tags: Tag[]
     onClose: () => void
     onStatusConfigUpdated: (updated: StatusConfig[]) => void
+    onTagsUpdated: (updated: Tag[]) => void
   } = $props()
+
+  let localTags = $state<Tag[]>(tags.map(t => ({ ...t })))
+  let tagColorPickerFor = $state<string | null>(null)
+  let confirmDeleteTagId = $state<string | null>(null)
+  let newTagName = $state("")
+  let newTagColor = $state(TAG_COLORS[0])
+  let showNewTagColorPicker = $state(false)
+
+  async function addTag() {
+    const name = newTagName.trim()
+    if (!name) return
+    const res = await fetch("/api/tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, color: newTagColor }),
+    })
+    if (res.ok || res.status === 409) {
+      const tag: Tag = await res.json()
+      if (!localTags.find(t => t._id === tag._id)) {
+        localTags = [...localTags, tag].sort((a, b) => a.name.localeCompare(b.name))
+      }
+      onTagsUpdated(localTags)
+      newTagName = ""
+      newTagColor = TAG_COLORS[0]
+    }
+  }
+
+  async function saveTagName(tagId: string, name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const res = await fetch(`/api/tags/${tagId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    })
+    if (res.ok) {
+      const updated: Tag = await res.json()
+      localTags = localTags.map(t => t._id === tagId ? updated : t)
+      onTagsUpdated(localTags)
+    }
+  }
+
+  async function setTagColor(tagId: string, color: string) {
+    const res = await fetch(`/api/tags/${tagId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color }),
+    })
+    if (res.ok) {
+      const updated: Tag = await res.json()
+      localTags = localTags.map(t => t._id === tagId ? updated : t)
+      onTagsUpdated(localTags)
+    }
+    tagColorPickerFor = null
+  }
+
+  async function deleteTag(tagId: string) {
+    confirmDeleteTagId = null
+    await fetch(`/api/tags/${tagId}`, { method: "DELETE" })
+    localTags = localTags.filter(t => t._id !== tagId)
+    onTagsUpdated(localTags)
+  }
 
   const STATUS_COLORS = [
     "#888888",
@@ -136,7 +203,7 @@
         >+ Add</button>
       </div>
 
-      <div class="space-y-1">
+      <div class="space-y-1" onclick={() => { colorPickerFor = null }}>
         {#each localStatuses as status, index (status.id)}
           <div class="flex items-center gap-2 group py-1">
             <!-- Color swatch -->
@@ -220,15 +287,112 @@
           </div>
         {/each}
       </div>
+
+      <!-- Tags section -->
+      <div class="mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs text-gray-400 uppercase tracking-wider">Tags</span>
+        </div>
+
+        <div class="space-y-1">
+          {#each localTags as tag (tag._id)}
+            <div class="flex items-center gap-2 group py-1">
+              <!-- Color swatch -->
+              <div class="relative flex-shrink-0">
+                <button
+                  class="w-5 h-5 rounded-full border-2 border-white/20 hover:border-white/50 transition-colors"
+                  style="background:{tag.color}"
+                  onclick={() => (tagColorPickerFor = tagColorPickerFor === tag._id ? null : tag._id)}
+                  title="Change color"
+                ></button>
+                {#if tagColorPickerFor === tag._id}
+                  <div
+                    class="absolute left-0 top-7 z-50 bg-gray-900 border border-white/10 rounded shadow-xl p-2 flex flex-wrap gap-1.5"
+                    style="width: 148px"
+                  >
+                    {#each TAG_COLORS as c}
+                      <button
+                        class="w-6 h-6 rounded-full border-2 transition-all {tag.color === c ? 'border-white scale-110' : 'border-transparent hover:border-white/40'}"
+                        style="background:{c}"
+                        onclick={() => setTagColor(tag._id, c)}
+                        aria-label="Select color {c}"
+                      ></button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Name input -->
+              <input
+                class="flex-1 bg-transparent text-sm text-gray-200 outline-none border-b border-transparent focus:border-border transition-colors py-0.5 min-w-0"
+                value={tag.name}
+                onblur={e => saveTagName(tag._id, (e.target as HTMLInputElement).value)}
+                onkeydown={e => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              />
+
+              <!-- Delete -->
+              {#if confirmDeleteTagId === tag._id}
+                <span class="flex items-center gap-1 flex-shrink-0">
+                  <button class="text-xs text-red-400 hover:text-red-300" onclick={() => deleteTag(tag._id)}>Delete</button>
+                  <button class="text-xs text-gray-500 hover:text-gray-300" onclick={() => confirmDeleteTagId = null}>Cancel</button>
+                </span>
+              {:else}
+                <button
+                  class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs transition-opacity flex-shrink-0"
+                  onclick={() => confirmDeleteTagId = tag._id}
+                  title="Delete tag"
+                >×</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+
+        <!-- New tag row -->
+        <div class="flex items-center gap-2 mt-2">
+          <div class="relative flex-shrink-0">
+            <button
+              class="w-5 h-5 rounded-full border-2 border-white/20 hover:border-white/50 transition-colors"
+              style="background:{newTagColor}"
+              onclick={() => (showNewTagColorPicker = !showNewTagColorPicker)}
+              title="Pick color"
+            ></button>
+            {#if showNewTagColorPicker}
+              <div
+                class="absolute left-0 top-7 z-50 bg-gray-900 border border-white/10 rounded shadow-xl p-2 flex flex-wrap gap-1.5"
+                style="width: 148px"
+              >
+                {#each TAG_COLORS as c}
+                  <button
+                    class="w-6 h-6 rounded-full border-2 transition-all {newTagColor === c ? 'border-white scale-110' : 'border-transparent hover:border-white/40'}"
+                    style="background:{c}"
+                    onclick={() => { newTagColor = c; showNewTagColorPicker = false }}
+                    aria-label="Select color {c}"
+                  ></button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+          <input
+            class="flex-1 bg-transparent text-sm text-gray-200 outline-none border-b border-border focus:border-white/40 transition-colors py-0.5 min-w-0"
+            placeholder="New tag name..."
+            bind:value={newTagName}
+            onkeydown={e => e.key === "Enter" && addTag()}
+          />
+          <button
+            class="text-xs text-gray-400 hover:text-gray-100 border border-border rounded px-2 py-0.5 flex-shrink-0"
+            onclick={addTag}
+          >Add</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Close color picker on outside click -->
-{#if colorPickerFor}
+<!-- Close color pickers on outside click -->
+{#if colorPickerFor || tagColorPickerFor || showNewTagColorPicker}
   <div
     class="fixed inset-0 z-40"
-    onclick={() => (colorPickerFor = null)}
+    onclick={() => { colorPickerFor = null; tagColorPickerFor = null; showNewTagColorPicker = false }}
     onkeydown={e => e.key === "Escape" && (colorPickerFor = null)}
     role="presentation"
   ></div>

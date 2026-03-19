@@ -1,5 +1,16 @@
 export type Priority = "none" | "low" | "medium" | "high" | "urgent"
 
+export const TAG_COLORS = ["#6366f1", "#3b82f6", "#06b6d4", "#10b981", "#84cc16", "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#8b5cf6", "#a855f7", "#6b7280"]
+
+export interface Tag {
+  _id: string
+  userId: string
+  name: string
+  color: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface StatusConfig {
   id: string
   name: string
@@ -19,6 +30,7 @@ export const DEFAULT_STATUSES: StatusConfig[] = [
 export interface UserSettings {
   userId: string
   statusConfig: StatusConfig[]
+  tagsMigrated?: boolean
 }
 
 export interface List {

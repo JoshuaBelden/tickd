@@ -6,7 +6,7 @@
   import SettingsModal from "$lib/components/SettingsModal.svelte"
   import { ICON_NAMES, DEFAULT_ICON } from "$lib/icons"
   import { showSearch, sidebarOpen } from "$lib/stores/ui"
-  import type { List, StatusConfig } from "$lib/types"
+  import type { List, StatusConfig, Tag } from "$lib/types"
   import { setContext, untrack } from "svelte"
 
   let { data, children } = $props()
@@ -15,6 +15,7 @@
   let showNewList = $state(false)
   let showSettings = $state(false)
   let statusConfig = $state<StatusConfig[]>(untrack(() => data.statusConfig))
+  let tags = $state<Tag[]>(untrack(() => data.tags))
   let editingList = $state<List | null>(null)
   let editName = $state("")
   let editColor = $state("")
@@ -24,7 +25,12 @@
     statusConfig = data.statusConfig
   })
 
+  $effect(() => {
+    tags = data.tags
+  })
+
   setContext("statusConfig", { get: () => statusConfig })
+  setContext("tags", { get: () => tags, set: (updated: Tag[]) => { tags = updated } })
 
   function onGlobalKeyDown(e: KeyboardEvent) {
     if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -449,7 +455,9 @@
 {#if showSettings}
   <SettingsModal
     {statusConfig}
+    {tags}
     onClose={() => (showSettings = false)}
     onStatusConfigUpdated={updated => (statusConfig = updated)}
+    onTagsUpdated={updated => (tags = updated)}
   />
 {/if}

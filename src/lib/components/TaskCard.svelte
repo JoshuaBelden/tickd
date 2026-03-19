@@ -1,6 +1,15 @@
 <script lang="ts">
-  import type { StatusConfig, Task } from "$lib/types"
+  import type { StatusConfig, Tag, Task } from "$lib/types"
   import { formatDate, isDueToday, isOverdue, priorityColor } from "$lib/utils"
+  import { getContext } from "svelte"
+
+  const tagsCtx = getContext<{ get: () => Tag[] }>("tags")
+  const allTags = $derived(tagsCtx.get())
+  const resolvedTags = $derived(
+    task.tags
+      .map(id => allTags.find(t => t._id === id))
+      .filter(Boolean) as Tag[]
+  )
 
   let {
     task,
@@ -122,8 +131,11 @@
     {#if subtaskCount > 0}
       <span class="text-xs text-gray-500 bg-white/5 rounded px-1">Subtasks {doneSubtasks}/{subtaskCount}</span>
     {/if}
-    {#each task.tags.slice(0, 2) as tag}
-      <span class="text-xs text-gray-500 bg-white/5 rounded px-1.5 py-0.5">{tag}</span>
+    {#each resolvedTags.slice(0, 2) as tag}
+      <span
+        class="text-xs rounded px-1.5 py-0.5"
+        style="background-color: {tag.color}25; color: {tag.color}"
+      >{tag.name}</span>
     {/each}
   </div>
 

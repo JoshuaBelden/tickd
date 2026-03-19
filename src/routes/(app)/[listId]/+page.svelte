@@ -7,23 +7,24 @@
   import TaskCard from "$lib/components/TaskCard.svelte"
   import TaskDetail from "$lib/components/TaskDetail.svelte"
   import { selectedTaskId, showSearch, viewMode } from "$lib/stores/ui"
-  import type { GroupBy, SortField, StatusConfig, Task } from "$lib/types"
+  import type { GroupBy, SortField, StatusConfig, Tag, Task } from "$lib/types"
   import { priorityOrder } from "$lib/utils"
   import { getContext, untrack } from "svelte"
 
   let { data } = $props()
 
   let tasks = $state<Task[]>(untrack(() => data.tasks))
-  let allTags = $state<string[]>(untrack(() => data.allTags))
   let list = $state(untrack(() => data.list))
 
   const statusConfigCtx = getContext<{ get: () => StatusConfig[] }>("statusConfig")
   const statusConfig = $derived(statusConfigCtx.get())
 
+  const tagsCtx = getContext<{ get: () => Tag[]; set: (t: Tag[]) => void }>("tags")
+  const allTags = $derived(tagsCtx.get())
+
   $effect(() => {
     tasks = data.tasks
     list = data.list
-    allTags = data.allTags
   })
 
   let showNewTask = $state(false)
