@@ -1,5 +1,7 @@
 # tickd
 
+![Screenshot](docs/screenshot.png)
+
 A task management app that gets out of your way. Organize work into lists, visualize it as a board or mind map, and keep moving.
 
 Built with SvelteKit, MongoDB, and a dark theme that doesn't hurt your eyes at 2am.
