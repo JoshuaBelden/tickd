@@ -174,6 +174,30 @@
         </div>
       {/if}
 
+      <!-- All Tasks link -->
+      <a
+        href="/all"
+        class="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-white/5 transition-colors mb-1 {$page.route.id === '/(app)/all'
+          ? 'bg-white/10 text-white'
+          : 'text-gray-400'} {$sidebarOpen ? '' : 'justify-center px-0'}"
+        title={$sidebarOpen ? undefined : "All Tasks"}
+        onclick={(e) => {
+          e.preventDefault()
+          if (window.innerWidth < 1024) {
+            sidebarOpen.set(false)
+          }
+          goto("/all")
+        }}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 flex-shrink-0">
+          <path d="M2 4.5A2.5 2.5 0 0 1 4.5 2h11A2.5 2.5 0 0 1 18 4.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 2 15.5v-11ZM4.5 3.5A1 1 0 0 0 3.5 4.5v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-11a1 1 0 0 0-1-1h-11Z" />
+          <path d="M10 6a.75.75 0 0 1 .75.75v2.5h2.5a.75.75 0 0 1 0 1.5h-2.5v2.5a.75.75 0 0 1-1.5 0v-2.5h-2.5a.75.75 0 0 1 0-1.5h2.5v-2.5A.75.75 0 0 1 10 6Z" />
+        </svg>
+        {#if $sidebarOpen}
+          <span class="flex-1 truncate">All Tasks</span>
+        {/if}
+      </a>
+
       {#each lists as list, i (list._id)}
         {#if dragIndex !== null && insertIndex === i}
           <div class="h-0.5 bg-accent rounded mx-1 my-0.5 pointer-events-none"></div>

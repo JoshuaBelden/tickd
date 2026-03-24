@@ -99,4 +99,4 @@ export interface FilterState {
 }
 
 export type SortField = "dueDate" | "priority" | "createdAt" | "order"
-export type GroupBy = "status" | "priority" | "none"
+export type GroupBy = "status" | "priority" | "list" | "none"

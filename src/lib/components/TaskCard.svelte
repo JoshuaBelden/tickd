@@ -21,6 +21,8 @@
     onDelete,
     indent = false,
     draggable = false,
+    listName,
+    listColor,
     onDragStart,
     onDragEnd,
   }: {
@@ -33,6 +35,8 @@
     onDelete: (id: string) => Promise<void>
     indent?: boolean
     draggable?: boolean
+    listName?: string
+    listColor?: string
     onDragStart?: (e: DragEvent) => void
     onDragEnd?: (e: DragEvent) => void
   } = $props()
@@ -210,6 +214,16 @@
       >{tag.name}</span>
     {/each}
   </div>
+
+  <!-- List column (only shown when listName is provided) -->
+  {#if listName}
+    <div class="hidden sm:flex w-28 flex-shrink-0 items-center gap-1.5 min-w-0">
+      {#if listColor}
+        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:{listColor}"></span>
+      {/if}
+      <span class="text-xs text-gray-400 truncate">{listName}</span>
+    </div>
+  {/if}
 
   <!-- Priority column -->
   <div class="hidden sm:flex w-28 flex-shrink-0 items-center gap-1.5">
