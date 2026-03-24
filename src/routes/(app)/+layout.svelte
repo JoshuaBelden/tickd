@@ -185,6 +185,9 @@
           ondragover={e => onDragOver(e, i)}
           ondrop={onDrop}
           ondragend={onDragEnd}
+          role="option"
+          aria-selected={$page.params.listId === list._id}
+          tabindex="0"
         >
           <a
             href="/{list._id}"

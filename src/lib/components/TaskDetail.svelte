@@ -453,10 +453,12 @@
                 title="Remove from task"
               >×</button>
               {#if tagMenuOpen === tagId}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div
                   class="absolute left-0 top-full mt-0.5 z-50 bg-gray-900 border border-white/10 rounded shadow-xl py-1 min-w-36"
                   onclick={e => e.stopPropagation()}
                   role="menu"
+                  tabindex="-1"
                 >
                   {#if tagColorPickerFor === tagId}
                     <div class="px-3 py-2">
@@ -466,6 +468,7 @@
                             class="w-5 h-5 rounded-full border-2 transition-all {tagObj.color === c ? 'border-white scale-110' : 'border-transparent'}"
                             style="background:{c}"
                             onclick={() => setTagColor(tagId, c)}
+                            aria-label="Select color {c}"
                           ></button>
                         {/each}
                       </div>
@@ -613,21 +616,29 @@
             </div>
           </div>
 
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="space-y-1 mb-2"
             ondragover={e => e.preventDefault()}
             ondrop={e => itemDrop(e, checklist.id)}
+            role="listbox"
+            aria-label="{checklist.title} items"
+            tabindex="-1"
           >
             {#each visibleItems as { item, idx } (item.id)}
               {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === idx}
                 <div class="h-0.5 bg-accent rounded pointer-events-none my-0.5"></div>
               {/if}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="flex items-center gap-2 group {clDragIndex[checklist.id] === idx ? 'opacity-40' : ''}"
                 draggable="true"
                 ondragstart={e => itemDragStart(e, checklist.id, idx)}
                 ondragover={e => itemDragOver(e, checklist.id, idx)}
                 ondragend={() => itemDragEnd(checklist.id)}
+                role="option"
+                aria-selected="false"
+                tabindex="0"
               >
                 <span class="cursor-grab text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">

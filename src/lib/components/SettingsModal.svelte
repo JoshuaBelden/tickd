@@ -16,6 +16,7 @@
     onTagsUpdated: (updated: Tag[]) => void
   } = $props()
 
+  // svelte-ignore state_referenced_locally
   let localTags = $state<Tag[]>(tags.map(t => ({ ...t })))
   let tagColorPickerFor = $state<string | null>(null)
   let confirmDeleteTagId = $state<string | null>(null)
@@ -92,6 +93,7 @@
   ]
 
   // Local copy we edit before saving
+  // svelte-ignore state_referenced_locally
   let localStatuses = $state<StatusConfig[]>(statusConfig.map(s => ({ ...s })))
   let colorPickerFor = $state<string | null>(null)
   let confirmDeleteId = $state<string | null>(null)
@@ -203,7 +205,13 @@
         >+ Add</button>
       </div>
 
-      <div class="space-y-1" onclick={() => { colorPickerFor = null }}>
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="space-y-1"
+        onclick={() => { colorPickerFor = null }}
+        onkeydown={e => e.key === "Escape" && (colorPickerFor = null)}
+        role="group"
+      >
         {#each localStatuses as status, index (status.id)}
           <div class="flex items-center gap-2 group py-1">
             <!-- Color swatch -->
