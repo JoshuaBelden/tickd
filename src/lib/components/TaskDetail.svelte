@@ -59,6 +59,8 @@
   let newItemMap = $state<Record<string, string>>({})
   let editingChecklistId = $state<string | null>(null)
   let editingChecklistTitle = $state("")
+  let editingItemKey = $state<string | null>(null)
+  let editingItemLabel = $state("")
   let confirmDeleteChecklistId = $state<string | null>(null)
   let clDragIndex = $state<Record<string, number | null>>({})
   let clInsertIndex = $state<Record<string, number | null>>({})
@@ -107,6 +109,19 @@
       await onUpdate(activeTask._id, { title: titleValue.trim() })
     }
     editingTitle = false
+  }
+
+  async function saveItemLabel(checklistId: string, itemId: string) {
+    const label = editingItemLabel.trim()
+    if (label) {
+      const updated = effectiveChecklists.map(cl =>
+        cl.id === checklistId
+          ? { ...cl, items: cl.items.map(it => (it.id === itemId ? { ...it, label } : it)) }
+          : cl,
+      )
+      await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
+    }
+    editingItemKey = null
   }
 
   async function saveChecklistTitle(checklistId: string) {
@@ -651,7 +666,28 @@
                   checked={item.checked}
                   onchange={() => toggleChecklistItem(checklist.id, item.id)}
                 />
-                <span class="flex-1 text-sm {item.checked ? 'line-through text-gray-500' : ''}">{item.label}</span>
+                {#if editingItemKey === `${checklist.id}:${item.id}`}
+                  <input
+                    class="flex-1 text-sm bg-transparent outline-none border-b border-gray-500"
+                    value={editingItemLabel}
+                    oninput={e => (editingItemLabel = (e.target as HTMLInputElement).value)}
+                    onblur={() => saveItemLabel(checklist.id, item.id)}
+                    onkeydown={e => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+                      if (e.key === "Escape") editingItemKey = null
+                    }}
+                    autofocus
+                  />
+                {:else}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <span
+                    class="flex-1 text-sm cursor-pointer {item.checked ? 'line-through text-gray-500' : ''}"
+                    ondblclick={() => {
+                      editingItemKey = `${checklist.id}:${item.id}`
+                      editingItemLabel = item.label
+                    }}
+                  >{item.label}</span>
+                {/if}
                 <button
                   class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs"
                   onclick={() => removeChecklistItem(checklist.id, item.id)}>×</button
