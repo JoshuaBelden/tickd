@@ -62,6 +62,8 @@
   const priorityDotColor = $derived(priorityColor(task.priority))
 
   let statusMenuOpen = $state(false)
+  let editingTitle = $state(false)
+  let editTitle = $state("")
 
   function openStatusMenu(e: MouseEvent) {
     e.stopPropagation()
@@ -76,21 +78,45 @@
     }
   }
 
-  function closeStatusMenu(e: MouseEvent) {
+  function closeStatusMenu() {
     statusMenuOpen = false
+  }
+
+  function startEditingTitle() {
+    editTitle = task.title
+    editingTitle = true
+  }
+
+  function commitTitle() {
+    editingTitle = false
+    const trimmed = editTitle.trim()
+    if (trimmed && trimmed !== task.title) {
+      onUpdate(task._id, { title: trimmed })
+    }
+  }
+
+  function handleRowClick() {
+    if (!editingTitle) {
+      startEditingTitle()
+    }
+  }
+
+  function handleTitleClick(e: MouseEvent) {
+    e.stopPropagation()
+    onclick()
   }
 </script>
 
 {#if statusMenuOpen}
-  <div class="fixed inset-0 z-40" onclick={closeStatusMenu} onkeydown={e => e.key === "Escape" && closeStatusMenu(e as any)} role="presentation"></div>
+  <div class="fixed inset-0 z-40" onclick={closeStatusMenu} onkeydown={e => e.key === "Escape" && closeStatusMenu()} role="presentation"></div>
 {/if}
 
 <div
   class="group flex items-center px-4 py-1 border-b border-border/40 hover:bg-white/5 cursor-pointer {selected
     ? 'bg-white/5'
     : ''} {isDone ? 'opacity-50' : ''} {indent ? 'pl-10 bg-black/10' : ''}"
-  {onclick}
-  onkeydown={e => (e.key === "Enter" || e.key === " ") && onclick()}
+  onclick={handleRowClick}
+  onkeydown={e => (e.key === "Enter" || e.key === " ") && handleRowClick()}
   role="button"
   tabindex="0"
 >
@@ -123,9 +149,28 @@
     </div>
 
     <!-- Title -->
-    <span class="flex-1 text-sm {isDone ? 'line-through text-gray-500' : 'text-gray-100'} truncate">
-      {task.title}
-    </span>
+    {#if editingTitle}
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="flex-1 text-sm bg-transparent outline-none border-b border-gray-500 {isDone ? 'line-through text-gray-500' : 'text-gray-100'}"
+        bind:value={editTitle}
+        autofocus
+        onclick={e => e.stopPropagation()}
+        onkeydown={e => {
+          e.stopPropagation()
+          if (e.key === "Enter") commitTitle()
+          if (e.key === "Escape") { editingTitle = false }
+        }}
+        onblur={commitTitle}
+      />
+    {:else}
+      <button
+        class="flex-1 text-sm text-left {isDone ? 'line-through text-gray-500' : 'text-gray-100'} truncate bg-transparent border-none p-0 cursor-pointer"
+        onclick={handleTitleClick}
+      >
+        {task.title}
+      </button>
+    {/if}
   </div>
 
   <!-- Pills -->
