@@ -20,6 +20,9 @@
     onUpdate,
     onDelete,
     indent = false,
+    draggable = false,
+    onDragStart,
+    onDragEnd,
   }: {
     task: Task
     tasks: Task[]
@@ -29,6 +32,9 @@
     onUpdate: (id: string, updates: Partial<Task>) => Promise<void>
     onDelete: (id: string) => Promise<void>
     indent?: boolean
+    draggable?: boolean
+    onDragStart?: (e: DragEvent) => void
+    onDragEnd?: (e: DragEvent) => void
   } = $props()
 
   const subtaskCount = $derived(tasks.filter(t => t.parentId === task._id).length)
@@ -97,13 +103,13 @@
 
   function handleRowClick() {
     if (!editingTitle) {
-      startEditingTitle()
+      onclick()
     }
   }
 
-  function handleTitleClick(e: MouseEvent) {
+  function handleEditClick(e: MouseEvent) {
     e.stopPropagation()
-    onclick()
+    startEditingTitle()
   }
 </script>
 
@@ -115,6 +121,10 @@
   class="group flex items-center px-4 py-1 border-b border-border/40 hover:bg-white/5 cursor-pointer {selected
     ? 'bg-white/5'
     : ''} {isDone ? 'opacity-50' : ''} {indent ? 'pl-10 bg-black/10' : ''}"
+  {draggable}
+  ondragstart={onDragStart}
+  ondragend={onDragEnd}
+  data-task-id={task._id}
   onclick={handleRowClick}
   onkeydown={e => (e.key === "Enter" || e.key === " ") && handleRowClick()}
   role="button"
@@ -124,6 +134,19 @@
   <div class="flex-1 flex items-center gap-2 min-w-0">
     {#if indent}
       <span class="text-gray-700 flex-shrink-0 text-xs">↳</span>
+    {/if}
+    <!-- Drag handle -->
+    {#if draggable}
+      <div class="flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-gray-400" aria-hidden="true">
+        <svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="5.5" cy="3.5" r="1.5" />
+          <circle cx="10.5" cy="3.5" r="1.5" />
+          <circle cx="5.5" cy="8" r="1.5" />
+          <circle cx="10.5" cy="8" r="1.5" />
+          <circle cx="5.5" cy="12.5" r="1.5" />
+          <circle cx="10.5" cy="12.5" r="1.5" />
+        </svg>
+      </div>
     {/if}
     <!-- Status indicator -->
     <div class="relative flex-shrink-0">
@@ -164,12 +187,11 @@
         onblur={commitTitle}
       />
     {:else}
-      <button
-        class="flex-1 text-sm text-left {isDone ? 'line-through text-gray-500' : 'text-gray-100'} truncate bg-transparent border-none p-0 cursor-pointer"
-        onclick={handleTitleClick}
+      <span
+        class="flex-1 text-sm text-left {isDone ? 'line-through text-gray-500' : 'text-gray-100'} truncate"
       >
         {task.title}
-      </button>
+      </span>
     {/if}
   </div>
 
@@ -204,6 +226,22 @@
   <div class="hidden sm:block w-28 flex-shrink-0">
     {#if task.dueDate}
       <span class="text-xs {dueDateClass}">{formatDate(task.dueDate)}</span>
+    {/if}
+  </div>
+
+  <!-- Edit button -->
+  <div class="w-6 flex-shrink-0 flex items-center justify-center">
+    {#if !editingTitle}
+      <button
+        class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-opacity"
+        onclick={handleEditClick}
+        title="Rename"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+          <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+        </svg>
+      </button>
     {/if}
   </div>
 

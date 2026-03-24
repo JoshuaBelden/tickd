@@ -36,6 +36,12 @@
   let inlineAddGroup = $state<string | null>(null)
   let inlineAddTitle = $state("")
 
+  // Drag-and-drop reorder state
+  let dragTaskId = $state<string | null>(null)
+  let dropTargetId = $state<string | null>(null)
+  let dropPosition = $state<"above" | "below">("below")
+  let dropGroupKey = $state<string | null>(null)
+
   // Filters
   let filterStatus = $state<string | null>(null)
   let filterPriority = $state<string | null>(null)
@@ -212,6 +218,104 @@
     confirmArchiveAllDone = null
   }
 
+  function handleDragStart(taskId: string, e: DragEvent) {
+    dragTaskId = taskId
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move"
+      e.dataTransfer.setData("text/plain", taskId)
+    }
+  }
+
+  function handleDragEnd() {
+    dragTaskId = null
+    dropTargetId = null
+    dropPosition = "below"
+    dropGroupKey = null
+  }
+
+  function handleDragOverTask(taskId: string, groupKey: string, e: DragEvent) {
+    e.preventDefault()
+    if (!dragTaskId || dragTaskId === taskId) return
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    dropPosition = e.clientY < midY ? "above" : "below"
+    dropTargetId = taskId
+    dropGroupKey = groupKey
+  }
+
+  function handleDragOverGroup(groupKey: string, e: DragEvent) {
+    e.preventDefault()
+    if (!dragTaskId) return
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
+    // Only set group drop if not over a specific task
+    if (!dropTargetId || dropGroupKey !== groupKey) {
+      dropTargetId = null
+      dropGroupKey = groupKey
+    }
+  }
+
+  async function handleDrop(groupKey: string) {
+    if (!dragTaskId) return
+
+    const dragTask = tasks.find(t => t._id === dragTaskId)
+    if (!dragTask) return
+
+    // Determine the target group's tasks
+    const group = groupedTasks.find(g => g.key === groupKey)
+    if (!group) return
+
+    // Build new ordered list for this group
+    let groupTasks = [...group.tasks.filter(t => t._id !== dragTaskId)]
+
+    // Determine new status if dragged across groups
+    let newStatus: string | undefined
+    if (groupBy === "status" && dragTask.status !== groupKey) {
+      newStatus = groupKey
+    }
+
+    if (dropTargetId) {
+      const targetIdx = groupTasks.findIndex(t => t._id === dropTargetId)
+      if (targetIdx >= 0) {
+        const insertIdx = dropPosition === "above" ? targetIdx : targetIdx + 1
+        groupTasks.splice(insertIdx, 0, dragTask)
+      } else {
+        groupTasks.push(dragTask)
+      }
+    } else {
+      // Dropped on empty group area — append to end
+      groupTasks.push(dragTask)
+    }
+
+    // Build updates
+    const updates = groupTasks.map((t, i) => ({
+      id: t._id,
+      order: i,
+      ...(t._id === dragTaskId && newStatus ? { status: newStatus } : {}),
+    }))
+
+    // Optimistic update
+    tasks = tasks.map(t => {
+      const u = updates.find(u => u.id === t._id)
+      if (u) {
+        const updated = { ...t, order: u.order }
+        if (u.status) updated.status = u.status
+        return updated
+      }
+      return t
+    })
+
+    handleDragEnd()
+
+    // Persist
+    await fetch("/api/tasks/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
+    })
+  }
+
   async function createSubtask(parentId: string, title: string) {
     const parent = tasks.find(t => t._id === parentId)
     const res = await fetch("/api/tasks", {
@@ -318,12 +422,14 @@
           <!-- Column headers -->
           <div class="flex items-center px-4 py-1.5 text-xs text-gray-500 border-b border-border bg-background sticky top-0 z-10">
             <div class="flex-1 flex items-center gap-2">
+              {#if sortBy === "order"}<div class="w-4 flex-shrink-0"></div>{/if}<!-- spacer for drag handle -->
               <div class="w-2.5 flex-shrink-0"></div><!-- spacer for status dot -->
               <span>Task</span>
             </div>
             <div class="hidden sm:block w-28 flex-shrink-0">Priority</div>
             <div class="hidden sm:block w-28 flex-shrink-0">Due Date</div>
-            <div class="w-6 flex-shrink-0"></div>
+            <div class="w-6 flex-shrink-0"></div><!-- spacer for edit -->
+            <div class="w-6 flex-shrink-0"></div><!-- spacer for delete -->
           </div>
 
           {#each groupedTasks as group (group.key)}
@@ -348,31 +454,46 @@
               </div>
 
               <!-- Tasks -->
-              {#each group.tasks as task (task._id)}
-                <TaskCard
-                  {task}
-                  {tasks}
-                  {statusConfig}
-                  selected={$selectedTaskId === task._id}
-                  onclick={() => ($selectedTaskId = task._id)}
-                  onUpdate={updateTask}
-                  onDelete={deleteTask}
-                />
-                {#if $showSubtasksInList}
-                  {#each tasks.filter(t => t.parentId === task._id) as subtask (subtask._id)}
+              <div
+                ondragover={e => handleDragOverGroup(group.key, e)}
+                ondrop={() => handleDrop(group.key)}
+                role="list"
+              >
+                {#each group.tasks as task (task._id)}
+                  <div
+                    ondragover={e => handleDragOverTask(task._id, group.key, e)}
+                    class="{dragTaskId === task._id ? 'opacity-30' : ''} {dropTargetId === task._id && dropPosition === 'above' ? 'border-t-2 border-t-blue-500' : ''} {dropTargetId === task._id && dropPosition === 'below' ? 'border-b-2 border-b-blue-500' : ''}"
+                    role="listitem"
+                  >
                     <TaskCard
-                      task={subtask}
+                      {task}
                       {tasks}
                       {statusConfig}
-                      selected={$selectedTaskId === subtask._id}
-                      onclick={() => ($selectedTaskId = subtask._id)}
+                      selected={$selectedTaskId === task._id}
+                      onclick={() => ($selectedTaskId = task._id)}
                       onUpdate={updateTask}
                       onDelete={deleteTask}
-                      indent={true}
+                      draggable={sortBy === "order"}
+                      onDragStart={e => handleDragStart(task._id, e)}
+                      onDragEnd={handleDragEnd}
                     />
-                  {/each}
-                {/if}
-              {/each}
+                  </div>
+                  {#if $showSubtasksInList}
+                    {#each tasks.filter(t => t.parentId === task._id) as subtask (subtask._id)}
+                      <TaskCard
+                        task={subtask}
+                        {tasks}
+                        {statusConfig}
+                        selected={$selectedTaskId === subtask._id}
+                        onclick={() => ($selectedTaskId = subtask._id)}
+                        onUpdate={updateTask}
+                        onDelete={deleteTask}
+                        indent={true}
+                      />
+                    {/each}
+                  {/if}
+                {/each}
+              </div>
 
               <!-- Inline add task -->
               {#if inlineAddGroup === group.key}

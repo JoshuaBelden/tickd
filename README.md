@@ -1,8 +1,8 @@
 # tickd
 
-![Screenshot](docs/screenshot.png)
-
 A task management app that gets out of your way. Organize work into lists, visualize it as a board or mind map, and keep moving.
+
+![Screenshot](docs/screenshot.png)
 
 Built with SvelteKit, MongoDB, and a dark theme that doesn't hurt your eyes at 2am.
 
@@ -17,15 +17,15 @@ Built with SvelteKit, MongoDB, and a dark theme that doesn't hurt your eyes at 2
 
 ## Tech Stack
 
-| Layer | Tech |
-|---|---|
+| Layer     | Tech                                                      |
+| --------- | --------------------------------------------------------- |
 | Framework | [SvelteKit 2](https://kit.svelte.dev) with Svelte 5 runes |
-| Database | [MongoDB](https://www.mongodb.com) |
-| Auth | [Lucia 3](https://lucia-auth.com) |
-| Styling | [Tailwind CSS 3](https://tailwindcss.com) |
-| Rich text | [Tiptap 2](https://tiptap.dev) |
-| Mind map | [XYFlow](https://xyflow.com) |
-| Deploy | [Vercel](https://vercel.com) |
+| Database  | [MongoDB](https://www.mongodb.com)                        |
+| Auth      | [Lucia 3](https://lucia-auth.com)                         |
+| Styling   | [Tailwind CSS 3](https://tailwindcss.com)                 |
+| Rich text | [Tiptap 2](https://tiptap.dev)                            |
+| Mind map  | [XYFlow](https://xyflow.com)                              |
+| Deploy    | [Vercel](https://vercel.com)                              |
 
 ## Getting Started
 
@@ -52,9 +52,9 @@ Open [http://localhost:5173](http://localhost:5173), register an account, and st
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `MONGODB_URI` | Yes | MongoDB connection string (e.g. `mongodb://localhost:27017/tickd` or an Atlas URI) |
+| Variable      | Required | Description                                                                        |
+| ------------- | -------- | ---------------------------------------------------------------------------------- |
+| `MONGODB_URI` | Yes      | MongoDB connection string (e.g. `mongodb://localhost:27017/tickd` or an Atlas URI) |
 
 ## Scripts
 
@@ -84,11 +84,11 @@ src/
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|---|---|
-| `N` | New task |
+| Shortcut     | Action           |
+| ------------ | ---------------- |
+| `N`          | New task         |
 | `Cmd/Ctrl+K` | Search all tasks |
-| `Esc` | Close modal |
+| `Esc`        | Close modal      |
 
 ## Deploying to Vercel
 
