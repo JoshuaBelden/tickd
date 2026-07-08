@@ -62,8 +62,12 @@
   let editingItemKey = $state<string | null>(null)
   let editingItemLabel = $state("")
   let confirmDeleteChecklistId = $state<string | null>(null)
+  let confirmDeleteCompletedId = $state<string | null>(null)
   let clDragIndex = $state<Record<string, number | null>>({})
   let clInsertIndex = $state<Record<string, number | null>>({})
+  let collapsedMap = $state<Record<string, boolean>>({})
+  let clDragChecklistIndex = $state<number | null>(null)
+  let clInsertChecklistIndex = $state<number | null>(null)
   let confirmDeleteTask = $state(false)
   let confirmArchiveTask = $state(false)
   let showMoveList = $state(false)
@@ -95,11 +99,14 @@
   $effect(() => {
     if (!browser) return
     const cls = effectiveChecklists
-    const map: Record<string, boolean> = {}
+    const doneMap: Record<string, boolean> = {}
+    const collapseMap: Record<string, boolean> = {}
     for (const cl of cls) {
-      map[cl.id] = localStorage.getItem(`show-done-${cl.id}`) === "true"
+      doneMap[cl.id] = localStorage.getItem(`show-done-${cl.id}`) === "true"
+      collapseMap[cl.id] = localStorage.getItem(`collapse-checklist-${cl.id}`) === "true"
     }
-    showCompletedMap = map
+    showCompletedMap = doneMap
+    collapsedMap = collapseMap
   })
 
   const statusInfo = $derived(statusConfig.find(s => s.id === activeTask.status))
@@ -139,6 +146,59 @@
     confirmDeleteChecklistId = null
   }
 
+  async function deleteCompletedItems(checklistId: string) {
+    const updated = effectiveChecklists.map(cl =>
+      cl.id === checklistId ? { ...cl, items: cl.items.filter(item => !item.checked) } : cl,
+    )
+    await onUpdate(activeTask._id, { checklists: updated, checklist: [] })
+    confirmDeleteCompletedId = null
+  }
+
+  function toggleCollapsed(checklistId: string) {
+    const next = !(collapsedMap[checklistId] ?? false)
+    collapsedMap = { ...collapsedMap, [checklistId]: next }
+    if (browser) localStorage.setItem(`collapse-checklist-${checklistId}`, String(next))
+  }
+
+  function checklistDragStart(e: DragEvent, idx: number) {
+    clDragChecklistIndex = idx
+    e.dataTransfer!.effectAllowed = "move"
+  }
+
+  function checklistDragOver(e: DragEvent, idx: number) {
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = "move"
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    clInsertChecklistIndex = e.clientY < rect.top + rect.height / 2 ? idx : idx + 1
+  }
+
+  async function checklistDrop(e: DragEvent) {
+    e.preventDefault()
+    const dragIdx = clDragChecklistIndex
+    const insertIdx = clInsertChecklistIndex
+    if (dragIdx === null || insertIdx === null) {
+      clDragChecklistIndex = null
+      clInsertChecklistIndex = null
+      return
+    }
+    if (insertIdx === dragIdx || insertIdx === dragIdx + 1) {
+      clDragChecklistIndex = null
+      clInsertChecklistIndex = null
+      return
+    }
+    const newChecklists = [...effectiveChecklists]
+    const [moved] = newChecklists.splice(dragIdx, 1)
+    newChecklists.splice(insertIdx > dragIdx ? insertIdx - 1 : insertIdx, 0, moved)
+    await onUpdate(activeTask._id, { checklists: newChecklists, checklist: [] })
+    clDragChecklistIndex = null
+    clInsertChecklistIndex = null
+  }
+
+  function checklistDragEnd() {
+    clDragChecklistIndex = null
+    clInsertChecklistIndex = null
+  }
+
   async function addChecklist() {
     const title = `Checklist ${effectiveChecklists.length + 1}`
     const newCl: Checklist = { id: nanoid(), title, items: [] }
@@ -173,12 +233,14 @@
   }
 
   function itemDragStart(e: DragEvent, checklistId: string, itemIndex: number) {
+    e.stopPropagation()
     clDragIndex = { ...clDragIndex, [checklistId]: itemIndex }
     e.dataTransfer!.effectAllowed = "move"
   }
 
   function itemDragOver(e: DragEvent, checklistId: string, itemIndex: number) {
     e.preventDefault()
+    e.stopPropagation()
     e.dataTransfer!.dropEffect = "move"
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     clInsertIndex = {
@@ -189,6 +251,7 @@
 
   async function itemDrop(e: DragEvent, checklistId: string) {
     e.preventDefault()
+    e.stopPropagation()
     const dragIdx = clDragIndex[checklistId]
     const insertIdx = clInsertIndex[checklistId]
     if (dragIdx === null || dragIdx === undefined || insertIdx === null || insertIdx === undefined) return
@@ -569,45 +632,69 @@
     </div>
 
     <!-- Checklists -->
-    <div class="space-y-4">
-      {#each effectiveChecklists as checklist (checklist.id)}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="space-y-4" ondragover={e => e.preventDefault()} ondrop={checklistDrop}>
+      {#each effectiveChecklists as checklist, clIdx (checklist.id)}
         {@const doneCount = checklist.items.filter(i => i.checked).length}
         {@const totalCount = checklist.items.length}
         {@const showDone = showCompletedMap[checklist.id] ?? false}
+        {@const isCollapsed = collapsedMap[checklist.id] ?? false}
         {@const visibleItems = checklist.items.map((item, idx) => ({ item, idx })).filter(({ item }) => !item.checked || showDone)}
-        <div>
+        {#if clDragChecklistIndex !== null && clInsertChecklistIndex === clIdx}
+          <div class="h-0.5 bg-accent rounded pointer-events-none"></div>
+        {/if}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="group/checklist {clDragChecklistIndex === clIdx ? 'opacity-40' : ''}"
+          draggable="true"
+          ondragstart={e => checklistDragStart(e, clIdx)}
+          ondragover={e => checklistDragOver(e, clIdx)}
+          ondragend={checklistDragEnd}
+        >
           <div class="flex items-center justify-between mb-1.5">
-            {#if editingChecklistId === checklist.id}
-              <!-- svelte-ignore a11y_autofocus -->
-              <input
-                class="input text-xs flex-1 mr-2"
-                value={editingChecklistTitle}
-                oninput={e => (editingChecklistTitle = (e.target as HTMLInputElement).value)}
-                onblur={() => saveChecklistTitle(checklist.id)}
-                onkeydown={e => {
-                  if (e.key === "Enter") saveChecklistTitle(checklist.id)
-                  if (e.key === "Escape") editingChecklistId = null
-                }}
-                autofocus
-              />
-            {:else}
-              <span
-                class="text-xs text-gray-500 cursor-text hover:text-gray-300"
-                onclick={() => {
-                  editingChecklistId = checklist.id
-                  editingChecklistTitle = checklist.title
-                }}
-                onkeydown={e => {
-                  if (e.key === "Enter" || e.key === " ") {
+            <div class="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+              <span class="cursor-grab text-gray-600 opacity-0 group-hover/checklist:opacity-100 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                  <path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+                </svg>
+              </span>
+              <button
+                class="text-gray-500 hover:text-gray-300 flex-shrink-0 text-base leading-none w-4 text-center"
+                onclick={() => toggleCollapsed(checklist.id)}
+                title={isCollapsed ? "Expand checklist" : "Collapse checklist"}
+              >{isCollapsed ? "▸" : "▾"}</button>
+              {#if editingChecklistId === checklist.id}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class="input text-xs flex-1"
+                  value={editingChecklistTitle}
+                  oninput={e => (editingChecklistTitle = (e.target as HTMLInputElement).value)}
+                  onblur={() => saveChecklistTitle(checklist.id)}
+                  onkeydown={e => {
+                    if (e.key === "Enter") saveChecklistTitle(checklist.id)
+                    if (e.key === "Escape") editingChecklistId = null
+                  }}
+                  autofocus
+                />
+              {:else}
+                <span
+                  class="text-xs text-gray-500 cursor-text hover:text-gray-300 truncate"
+                  onclick={() => {
                     editingChecklistId = checklist.id
                     editingChecklistTitle = checklist.title
-                  }
-                }}
-                role="button"
-                tabindex="0">{checklist.title}</span
-              >
-            {/if}
-            <div class="flex items-center gap-2">
+                  }}
+                  onkeydown={e => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      editingChecklistId = checklist.id
+                      editingChecklistTitle = checklist.title
+                    }
+                  }}
+                  role="button"
+                  tabindex="0">{checklist.title}</span
+                >
+              {/if}
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
               {#if totalCount > 0}
                 <span class="text-xs text-gray-500">{doneCount}/{totalCount}</span>
               {/if}
@@ -631,94 +718,117 @@
             </div>
           </div>
 
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="space-y-1 mb-2"
-            ondragover={e => e.preventDefault()}
-            ondrop={e => itemDrop(e, checklist.id)}
-            role="listbox"
-            aria-label="{checklist.title} items"
-            tabindex="-1"
-          >
-            {#each visibleItems as { item, idx } (item.id)}
-              {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === idx}
+          {#if !isCollapsed}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="space-y-1 mb-2"
+              ondragover={e => e.preventDefault()}
+              ondrop={e => itemDrop(e, checklist.id)}
+              role="listbox"
+              aria-label="{checklist.title} items"
+              tabindex="-1"
+            >
+              {#each visibleItems as { item, idx } (item.id)}
+                {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === idx}
+                  <div class="h-0.5 bg-accent rounded pointer-events-none my-0.5"></div>
+                {/if}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="flex items-center gap-2 group {clDragIndex[checklist.id] === idx ? 'opacity-40' : ''}"
+                  draggable="true"
+                  ondragstart={e => itemDragStart(e, checklist.id, idx)}
+                  ondragover={e => itemDragOver(e, checklist.id, idx)}
+                  ondragend={() => itemDragEnd(checklist.id)}
+                  role="option"
+                  aria-selected="false"
+                  tabindex="0"
+                >
+                  <span class="cursor-grab text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                      <path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="checkbox"
+                    class="accent-accent"
+                    checked={item.checked}
+                    onchange={() => toggleChecklistItem(checklist.id, item.id)}
+                  />
+                  {#if editingItemKey === `${checklist.id}:${item.id}`}
+                    <input
+                      class="flex-1 text-sm bg-transparent outline-none border-b border-gray-500"
+                      value={editingItemLabel}
+                      oninput={e => (editingItemLabel = (e.target as HTMLInputElement).value)}
+                      onblur={() => saveItemLabel(checklist.id, item.id)}
+                      onkeydown={e => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+                        if (e.key === "Escape") editingItemKey = null
+                      }}
+                      autofocus
+                    />
+                  {:else}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <span
+                      class="flex-1 text-sm cursor-pointer {item.checked ? 'line-through text-gray-500' : ''}"
+                      ondblclick={() => {
+                        editingItemKey = `${checklist.id}:${item.id}`
+                        editingItemLabel = item.label
+                      }}
+                    >{item.label}</span>
+                  {/if}
+                  <button
+                    class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs"
+                    onclick={() => removeChecklistItem(checklist.id, item.id)}>×</button
+                  >
+                </div>
+              {/each}
+              {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === checklist.items.length}
                 <div class="h-0.5 bg-accent rounded pointer-events-none my-0.5"></div>
               {/if}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div
-                class="flex items-center gap-2 group {clDragIndex[checklist.id] === idx ? 'opacity-40' : ''}"
-                draggable="true"
-                ondragstart={e => itemDragStart(e, checklist.id, idx)}
-                ondragover={e => itemDragOver(e, checklist.id, idx)}
-                ondragend={() => itemDragEnd(checklist.id)}
-                role="option"
-                aria-selected="false"
-                tabindex="0"
-              >
-                <span class="cursor-grab text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                    <path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM7 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM15 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
-                  </svg>
-                </span>
-                <input
-                  type="checkbox"
-                  class="accent-accent"
-                  checked={item.checked}
-                  onchange={() => toggleChecklistItem(checklist.id, item.id)}
-                />
-                {#if editingItemKey === `${checklist.id}:${item.id}`}
-                  <input
-                    class="flex-1 text-sm bg-transparent outline-none border-b border-gray-500"
-                    value={editingItemLabel}
-                    oninput={e => (editingItemLabel = (e.target as HTMLInputElement).value)}
-                    onblur={() => saveItemLabel(checklist.id, item.id)}
-                    onkeydown={e => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur()
-                      if (e.key === "Escape") editingItemKey = null
-                    }}
-                    autofocus
-                  />
-                {:else}
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <span
-                    class="flex-1 text-sm cursor-pointer {item.checked ? 'line-through text-gray-500' : ''}"
-                    ondblclick={() => {
-                      editingItemKey = `${checklist.id}:${item.id}`
-                      editingItemLabel = item.label
-                    }}
-                  >{item.label}</span>
-                {/if}
+            </div>
+
+            {#if doneCount > 0}
+              <div class="flex items-center gap-2 mb-2">
                 <button
-                  class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs"
-                  onclick={() => removeChecklistItem(checklist.id, item.id)}>×</button
+                  class="text-xs text-gray-500 hover:text-gray-300"
+                  onclick={() => toggleShowCompleted(checklist.id)}
                 >
+                  {showDone ? "Hide" : "Show"} {doneCount} completed item{doneCount !== 1 ? "s" : ""}
+                </button>
+                {#if confirmDeleteCompletedId === checklist.id}
+                  <span class="text-xs text-gray-400">Delete completed?</span>
+                  <button
+                    class="text-xs text-red-400 hover:text-red-300"
+                    onclick={() => deleteCompletedItems(checklist.id)}>Yes</button
+                  >
+                  <button
+                    class="text-xs text-gray-500 hover:text-gray-300"
+                    onclick={() => (confirmDeleteCompletedId = null)}>No</button
+                  >
+                {:else}
+                  <button
+                    class="text-xs text-gray-600 hover:text-red-400"
+                    onclick={() => (confirmDeleteCompletedId = checklist.id)}
+                  >Delete Completed</button>
+                {/if}
               </div>
-            {/each}
-            {#if clDragIndex[checklist.id] !== null && clInsertIndex[checklist.id] === checklist.items.length}
-              <div class="h-0.5 bg-accent rounded pointer-events-none my-0.5"></div>
             {/if}
-          </div>
 
-          {#if doneCount > 0}
-            <button
-              class="text-xs text-gray-500 hover:text-gray-300 mb-2 block"
-              onclick={() => toggleShowCompleted(checklist.id)}
-            >
-              {showDone ? "Hide" : "Show"} {doneCount} completed item{doneCount !== 1 ? "s" : ""}
-            </button>
+            <input
+              class="input text-xs"
+              placeholder="Add item..."
+              value={newItemMap[checklist.id] ?? ""}
+              oninput={e => {
+                newItemMap = { ...newItemMap, [checklist.id]: (e.target as HTMLInputElement).value }
+              }}
+              onkeydown={e => e.key === "Enter" && addChecklistItem(checklist.id)}
+            />
           {/if}
-
-          <input
-            class="input text-xs"
-            placeholder="Add item..."
-            value={newItemMap[checklist.id] ?? ""}
-            oninput={e => {
-              newItemMap = { ...newItemMap, [checklist.id]: (e.target as HTMLInputElement).value }
-            }}
-            onkeydown={e => e.key === "Enter" && addChecklistItem(checklist.id)}
-          />
         </div>
       {/each}
+      {#if clDragChecklistIndex !== null && clInsertChecklistIndex === effectiveChecklists.length}
+        <div class="h-0.5 bg-accent rounded pointer-events-none"></div>
+      {/if}
 
       <button class="text-xs text-gray-500 hover:text-gray-300" onclick={addChecklist}>+ Add checklist</button>
     </div>
